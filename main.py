@@ -1,16 +1,15 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    import exploVQE as vq
+    for j in range(2, 7):
+        print(f"Layers: {j}")
+        for i in range(4, 15):
+            print(f"Quibits: {i}")
+            vq.dataretriver.overlap_evaluater_parallel(starting=0, ending=100, layer_number=j, nodes_number=i,
+                                            initial_point=True, random=True)
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    for j in range(1, 7):
+        print(f"Layers: {j}")
+        for i in range(4, 15):
+            print(f"Quibits: {i}")
+            vq.dataretriver.overlap_evaluater_parallel(starting=0, ending=100, layer_number=j, nodes_number=i,
+                                            initial_point=True, random=True)
