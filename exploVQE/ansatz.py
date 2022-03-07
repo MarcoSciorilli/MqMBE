@@ -60,17 +60,36 @@ def circuit_none(size=6):
     c.add((gates.H(q) for q in range(size)))
     return c
 
-def var_form(size = 6, p: int = 1, entanglement='linear', true_vector=None):
+def var_form(size = 6, p: int = 1, entanglement='basic'):
     c = models.Circuit(size)
     c.add((gates.H(q) for q in range(size)))
-    for l in range(p):
-        c.add((gates.CZ(q, q + 1) for q in range(0, size - 1, 2)))
-        c.add((gates.CZ(q, q + 1) for q in range(1, size - 2, 2)))
-        c.add((gates.RZ(q, theta=0) for q in range(size)))
-        c.add((gates.RX(q, theta=-pi/2, trainable=False) for q in range(size)))
-        c.add((gates.RZ(q, theta=0) for q in range(size)))
-        c.add((gates.RX(q, theta=pi/2, trainable=False) for q in range(size)))
-        c.add((gates.RZ(q, theta=0) for q in range(size)))
+    if entanglement == 'basic':
+        for l in range(p):
+            c.add((gates.CZ(q, q + 1) for q in range(0, size - 1, 2)))
+            c.add((gates.CZ(q, q + 1) for q in range(1, size - 2, 2)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=-pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+    if entanglement == 'interleaved':
+        for l in range(p):
+            for k in range(size):
+                c.add((gates.CZ(k, k + 1)))
+                c.add((gates.RZ(k, theta=0)))
+                c.add((gates.RX(k, theta=-pi/2, trainable=False)))
+                c.add((gates.RZ(k, theta=0)))
+                c.add((gates.RX(k, theta=pi/2, trainable=False)))
+                c.add((gates.RZ(k, theta=0)))
+    if entanglement == 'linear':
+        for l in range(p):
+            c.add((gates.CZ(q, q + 1) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=-pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+
 
     return c
 

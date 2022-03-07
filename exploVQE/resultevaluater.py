@@ -5,8 +5,8 @@ import numpy as np
 from numpy import linalg as la
 import cvxpy as cvx
 from exploVQE.newgraph import create_graph, quadratic_program_from_graph
-
-
+import os
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 
 

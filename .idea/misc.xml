@@ -1,4 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.8 (pythonProject)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.8 (venv)" project-jdk-type="Python SDK" />
+  <component name="UnattendedHostPersistenceState">
+    <option name="openedFilesInfos">
+      <list>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="7277" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/exploVQE/dataretriver.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="665" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/main.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="266" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/exploVQE/resultevaluater.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="2941" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/exploVQE/ansatz.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="0" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/Tests.ipynb" />
+        </OpenedFileInfo>
+      </list>
+    </option>
+  </component>
 </project>
