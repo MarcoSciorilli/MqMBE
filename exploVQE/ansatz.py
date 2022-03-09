@@ -5,6 +5,7 @@ from math import pi
 from qibo import models, gates
 from qibo import callbacks
 
+
 def qaoa_circuit(qubo: QuadraticProgram, p: int = 1):
     """
     Given a QUBO instance and the number of layers p, constructs the corresponding parameterized QAOA circuit with p layers.
@@ -74,22 +75,53 @@ def var_form(size = 6, p: int = 1, entanglement='basic'):
             c.add((gates.RZ(q, theta=0) for q in range(size)))
     if entanglement == 'interleaved':
         for l in range(p):
-            for k in range(size):
-                c.add((gates.CZ(k, k + 1)))
+            for k in range(size-1):
                 c.add((gates.RZ(k, theta=0)))
                 c.add((gates.RX(k, theta=-pi/2, trainable=False)))
                 c.add((gates.RZ(k, theta=0)))
                 c.add((gates.RX(k, theta=pi/2, trainable=False)))
                 c.add((gates.RZ(k, theta=0)))
+                c.add((gates.CZ(k, k + 1)))
+            c.add((gates.RZ(size-1, theta=0)))
+            c.add((gates.RX(size-1, theta=-pi / 2, trainable=False)))
+            c.add((gates.RZ(size-1, theta=0)))
+            c.add((gates.RX(size-1, theta=pi / 2, trainable=False)))
+            c.add((gates.RZ(size-1, theta=0)))
     if entanglement == 'linear':
         for l in range(p):
-            c.add((gates.CZ(q, q + 1) for q in range(size)))
+            for k in range(size-1):
+                c.add((gates.CZ(k, k+1)))
             c.add((gates.RZ(q, theta=0) for q in range(size)))
             c.add((gates.RX(q, theta=-pi/2, trainable=False) for q in range(size)))
             c.add((gates.RZ(q, theta=0) for q in range(size)))
             c.add((gates.RX(q, theta=pi/2, trainable=False) for q in range(size)))
             c.add((gates.RZ(q, theta=0) for q in range(size)))
 
+    if entanglement == 'circular':
+        for l in range(p):
+            c.add((gates.CZ(size-1, 0)))
+            for k in range(size-1):
+                c.add((gates.CZ(k, k+1)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=-pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+            c.add((gates.RX(q, theta=pi/2, trainable=False) for q in range(size)))
+            c.add((gates.RZ(q, theta=0) for q in range(size)))
+    if entanglement == 'circular-interleaved':
+        for l in range(p):
+            for k in range(size-1):
+                c.add((gates.RZ(k, theta=0)))
+                c.add((gates.RX(k, theta=-pi/2, trainable=False)))
+                c.add((gates.RZ(k, theta=0)))
+                c.add((gates.RX(k, theta=pi/2, trainable=False)))
+                c.add((gates.RZ(k, theta=0)))
+                c.add((gates.CZ(k, k + 1)))
+            c.add((gates.RZ(size-1, theta=0)))
+            c.add((gates.RX(size-1, theta=-pi / 2, trainable=False)))
+            c.add((gates.RZ(size-1, theta=0)))
+            c.add((gates.RX(size-1, theta=pi / 2, trainable=False)))
+            c.add((gates.RZ(size-1, theta=0)))
+            c.add((gates.CZ(size - 1, 0)))
 
     return c
 

@@ -1,3 +1,4 @@
+from exploVQE import plots
 from exploVQE import ansatz
 from exploVQE import newgraph
 from exploVQE import dataretriver

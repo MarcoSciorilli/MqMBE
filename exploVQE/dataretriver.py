@@ -3,12 +3,11 @@ import numpy as np
 from time import time
 from exploVQE.newgraph import create_graph, quadratic_program_from_graph
 from exploVQE.resultevaluater import classical_solution, get_overlap
-from exploVQE.ansatz import var_form,circuit_none, overlap_retriver
-from qibo import models,hamiltonians,callbacks, gates
+from exploVQE.ansatz import var_form, circuit_none, overlap_retriver
+from qibo import models, hamiltonians, callbacks, gates
 import qibo
 import pickle
-import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
 
 def classical_soution_finder(starting=0, ending=10, nodes_number=6, random=False):
     """
@@ -22,10 +21,8 @@ def classical_soution_finder(starting=0, ending=10, nodes_number=6, random=False
         None
 
     """
-    process_number = 20
-    result_exact = np.empty(ending - starting)
+    process_number = 10
     pool = mp.Pool(process_number)
-
     result = [pool.apply_async(classical_solution, (i, nodes_number, random)) for i in range(starting, ending)]
     pool.close()
     pool.join()
@@ -50,7 +47,7 @@ def overlap_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_numb
         None
 
     """
-    process_number = 1
+    process_number = 30
     pool = mp.Pool(process_number)
     overlaps = np.empty(ending - starting)
     energies = np.empty(ending - starting)
@@ -61,15 +58,14 @@ def overlap_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_numb
                         range(starting, ending)]
         results = [pool.apply_async(single_graph_evaluation, (i, result_exact[i - starting], layer_number,
                                                               optimization, nodes_number, graph_list[i], initial_point,
-                                                              random,entanglement)) for i in range(starting, ending)]
-
+                                                              random, entanglement)) for i in range(starting, ending)]
 
     else:
-        result_exact = exact_loader(nodes_number,starting,ending,random)
+        result_exact = exact_loader(nodes_number, starting, ending, random)
         start = time()
         results = [pool.apply_async(single_graph_evaluation, (i, result_exact[i - starting], layer_number,
                                                               optimization, nodes_number, graph_list, initial_point,
-                                                              random,entanglement)) for i in range(starting, ending)]
+                                                              random, entanglement)) for i in range(starting, ending)]
     average_time = (time() - start) * process_number / (ending - starting)
     my_results = [r.get() for r in results]
     for i in range(len(my_results)):
@@ -79,10 +75,27 @@ def overlap_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_numb
     pool.join()
 
     file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,
-                 random, average_time,entanglement)
+                 random, average_time, entanglement)
 
 
 def overlap_evaluater(starting=0, ending=10, layer_number=1, nodes_number=6, optimization='COBYLA',
+                      graph_list=None,
+                      initial_point=False, random=False, entanglement='basic'):
+    if nodes_number < 14:
+        qibo.set_backend("numpy")
+        my_time = time()
+        overlap_evaluater_parallel(starting=starting, ending=ending, layer_number=layer_number, nodes_number=nodes_number, optimization=optimization,
+                                   graph_list=graph_list, initial_point=initial_point, random=random, entanglement=entanglement)
+        print("tempo totale:", time()-my_time)
+    else:
+        qibo.set_backend("qibotf")
+        my_time = time()
+        overlap_evaluater_serial(starting=starting, ending=ending, layer_number=layer_number, nodes_number=nodes_number, optimization=optimization,
+                                   graph_list=graph_list, initial_point=initial_point, random=random, entanglement=entanglement)
+        print("tempo totale:", time() - my_time)
+
+
+def overlap_evaluater_serial(starting=0, ending=10, layer_number=1, nodes_number=6, optimization='COBYLA',
                       graph_list=None,
                       initial_point=False, random=False, entanglement='basic'):
     """
@@ -97,33 +110,28 @@ def overlap_evaluater(starting=0, ending=10, layer_number=1, nodes_number=6, opt
         None
 
     """
-    #qibo.set_device("/device:GPU:3")
+
     overlaps = np.empty(ending - starting)
     energies = np.empty(ending - starting)
-    result_exact = exact_loader(nodes_number,starting,ending,random)
+    result_exact = exact_loader(nodes_number, starting, ending, random)
     start = time()
-    #my_results = [
-    #    single_graph_evaluation(i, result_exact[i - starting], layer_number,
-    #                            optimization, nodes_number, graph_list, initial_point,
-    #                            random) for i in range(ending - starting)]
-    i = starting
-    my_results = single_graph_evaluation(i, result_exact[i - starting], layer_number,
+    my_results = [
+        single_graph_evaluation(i, result_exact[i - starting], layer_number,
                                 optimization, nodes_number, graph_list, initial_point,
-                                random,entanglement)
-    my_results = [my_results]
+                                random, entanglement) for i in range(ending - starting)]
+
     average_time = (time() - start) / (ending - starting)
     for i in range(len(my_results)):
         overlaps[i] = my_results[i][1]
         energies[i] = my_results[i][2]
 
     file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,
-                 random, average_time,entanglement)
+                 random, average_time, entanglement)
 
 
 def single_graph_evaluation(index, result_exact=None, layer_number=1, optimization='COBYLA', nodes_number=6,
                             graph=None,
                             initial_parameters=None, random=False, entanglement='basic'):
-
     if graph is None:
         graph = create_graph(index, nodes_number, random)
     quadratic_program = quadratic_program_from_graph(graph)
@@ -131,17 +139,16 @@ def single_graph_evaluation(index, result_exact=None, layer_number=1, optimizati
     if initial_parameters:
         initial_parameters = np.random.normal(0.5, 0.01, 3 * layer_number * nodes_number)
     if layer_number > 0:
-        circuit = var_form(nodes_number,layer_number, entanglement)
+        circuit = var_form(nodes_number, layer_number, entanglement)
         hamiltonian = hamiltonians.Hamiltonian(nodes_number, quadratic_program)
         solver = models.VQE(circuit, hamiltonian)
-        result, params, extra = solver.minimize(initial_parameters, method=optimization, compile=False)
-        circuit = var_form(nodes_number,layer_number)
+        result, params, extra = solver.minimize(initial_parameters, method=optimization, compile=False, tol=1.11e-6)
+        circuit = var_form(nodes_number, layer_number)
         overlap = callbacks.Overlap(right_solution)
         circuit.add(gates.CallbackGate(overlap))
         circuit.set_parameters(params)
         circuit()
-
-        return [index, float(overlap[0]),(result - result_exact[0]) / (result_exact[1] - result_exact[0])]
+        return [index, float(overlap[0]), (result - result_exact[0]) / (result_exact[1] - result_exact[0])]
     else:
         circuit = circuit_none(nodes_number)
         outputstate = circuit()
@@ -157,7 +164,8 @@ def file_manager(overlaps, energies, layer_number, nodes_number, starting, endin
         np.save(f, energies)
         np.save(f, average_time)
 
-def exact_loader(nodes_number,starting,ending,random):
+
+def exact_loader(nodes_number, starting, ending, random):
     with open(
             f'exact_solution_n_{nodes_number}_s_{starting}_e_{ending}_random_{random}.npy',
             'rb') as f:
