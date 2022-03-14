@@ -7,8 +7,6 @@ import cvxpy as cvx
 from exploVQE.newgraph import create_graph, quadratic_program_from_graph
 
 
-
-
 def classical_solution(index, nodes_number, random, graph=None):
     if graph is None:
         graph = create_graph(index, nodes_number, random)

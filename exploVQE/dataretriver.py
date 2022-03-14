@@ -21,7 +21,7 @@ def classical_soution_finder(starting=0, ending=10, nodes_number=6, random=False
         None
 
     """
-    process_number = 10
+    process_number = 4
     pool = mp.Pool(process_number)
     result = [pool.apply_async(classical_solution, (i, nodes_number, random)) for i in range(starting, ending)]
     pool.close()
@@ -138,21 +138,17 @@ def single_graph_evaluation(index, result_exact=None, layer_number=1, optimizati
     right_solution = result_exact[2]
     if initial_parameters:
         initial_parameters = np.random.normal(0.5, 0.01, 3 * layer_number * nodes_number)
-    if layer_number > 0:
-        circuit = var_form(nodes_number, layer_number, entanglement)
-        hamiltonian = hamiltonians.Hamiltonian(nodes_number, quadratic_program)
-        solver = models.VQE(circuit, hamiltonian)
-        result, params, extra = solver.minimize(initial_parameters, method=optimization, compile=False, tol=1.11e-6)
-        circuit = var_form(nodes_number, layer_number)
-        overlap = callbacks.Overlap(right_solution)
-        circuit.add(gates.CallbackGate(overlap))
-        circuit.set_parameters(params)
-        circuit()
-        return [index, float(overlap[0]), (result - result_exact[0]) / (result_exact[1] - result_exact[0])]
-    else:
-        circuit = circuit_none(nodes_number)
-        outputstate = circuit()
-        return get_overlap(right_solution, outputstate.data)
+    circuit = var_form(nodes_number, layer_number, entanglement)
+    hamiltonian = hamiltonians.Hamiltonian(nodes_number, quadratic_program)
+    solver = models.VQE(circuit, hamiltonian)
+    result, params, extra = solver.minimize(initial_parameters, method=optimization, compile=False, tol=1.11e-6)
+    circuit = var_form(nodes_number, layer_number)
+    overlap = callbacks.Overlap(right_solution)
+    circuit.add(gates.CallbackGate(overlap))
+    circuit.set_parameters(params)
+    circuit()
+    return [index, float(overlap[0]), (result - result_exact[0]) / (result_exact[1] - result_exact[0])]
+
 
 
 def file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,
