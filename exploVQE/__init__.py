@@ -4,3 +4,4 @@ from exploVQE import newgraph
 from exploVQE import dataretriver
 from exploVQE import resultevaluater
 from exploVQE import multibase
+from exploVQE import variational
