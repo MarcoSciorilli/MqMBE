@@ -40,7 +40,6 @@ def VQE_evaluater(starting=0, ending=10, layer_number=1, nodes_number=6, optimiz
                       graph_list=None,
                       pick_init_parameter=True, random_graphs=False, entanglement='basic', multibase=False):
     if nodes_number < 14:
-        print("ARRIVO QUI")
         qibo.set_backend("numpy")
         my_time = time()
         VQE_evaluater_parallel(starting=starting, ending=ending, layer_number=layer_number, nodes_number=nodes_number, optimization=optimization,

@@ -76,12 +76,12 @@ def weighted_graph(graph: nx.Graph, weight_range: Tuple[float, float] = (0, 1), 
                    seed: Optional[int] = None, softmax=False) -> nx.Graph:
     """
     Takes an unweighted input graph and returns a weighted graph where the weights are uniformly sampled at random
-    :param graph:
-    :param weight_range:
-    :param integer_weights:
-    :param seed:
-    :param softmax:
-    :return:
+    :param graph: The graph to weight
+    :param weight_range: The range of values for the weights
+    :param integer_weights: True if only integer weight are considered
+    :param seed: Seed for the generation of the random weight
+    :param softmax: True to map the weigths into a softmax
+    :return: The weighted graph
     """
     """
     Args:
