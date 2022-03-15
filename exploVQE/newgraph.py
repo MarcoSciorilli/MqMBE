@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import networkx as nx
 import numpy as np
 from qiskit_optimization import QuadraticProgram
@@ -7,17 +7,22 @@ from qiskit_optimization import QuadraticProgram
 from itertools import combinations, groupby
 
 
-def complete_graph_instantiater(number=50, size=10):
+def complete_graph_instantiater(number: int = 50, size: int = 10) -> List:
+    """
+    Function which create a list of fully connected graphs with random weights.
+    :param number: Number of graphs in the list
+    :param size: Number of nodes in each graph
+    :return: List of nx graphs
+    """
     dummy_graph = nx.complete_graph(size)
     return [weighted_graph(dummy_graph) for i in range(number)]
 
 
 def quadratic_program_from_graph(graph: nx.Graph) -> QuadraticProgram:
-    """Constructs a quadratic program from a given graph for a MaxCut problem instance.
-    Args:
-        graph: Underlying graph of the problem.
-    Returns:
-        QuadraticProgram
+    """
+    Constructs a quadratic program from a given graph for a MaxCut problem instance.
+    :param graph: Underlying graph of the problem.
+    :return: QuadraticProgram
     """
 
     # Get weight matrix of graph
@@ -45,12 +50,24 @@ def quadratic_program_from_graph(graph: nx.Graph) -> QuadraticProgram:
     return my_quadratic_program.to_ising()[0].to_matrix()
 
 
-def create_graph(index, nodes_number, random, softmax=False):
+def create_graph(index: int, nodes_number: int, random: Optional[bool], softmax: Optional[bool] = False) -> nx.Graph:
+    """
+    Function which create a random connected graph.
+    :param index: Seed of the random number generator
+    :param nodes_number: Number of nodes
+    :param random: If False, also the seed is picked at random
+    :param softmax: If True, perform a softmax transformation of the weights of the graph
+    :return: A graph
+    """
+    # Initialise the probability of each node of having an edge with a neighbour
     p = 1
+    # Fix the probability if the same seed is used
     if random:
         np.random.seed(index)
         p = np.random.uniform(0, 1)
+    # Create the graph unweighted
     dummy_graph = gnp_random_connected_graph(nodes_number, p, index)
+    # Assign weight to the edges
     graph = weighted_graph(dummy_graph, seed=index, softmax=softmax)
     return graph
 
@@ -59,6 +76,14 @@ def weighted_graph(graph: nx.Graph, weight_range: Tuple[float, float] = (0, 1), 
                    seed: Optional[int] = None, softmax=False) -> nx.Graph:
     """
     Takes an unweighted input graph and returns a weighted graph where the weights are uniformly sampled at random
+    :param graph:
+    :param weight_range:
+    :param integer_weights:
+    :param seed:
+    :param softmax:
+    :return:
+    """
+    """
     Args:
         graph: Unweighted graph to add edge weights to
         weight_range: Range of weights to sample from

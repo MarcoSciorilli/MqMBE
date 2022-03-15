@@ -69,6 +69,26 @@ def get_overlap(vector_1, vector_2):
     return overlap
 
 
+def brute_force(w,n):
+    cuts ={}
+    for b in range(2**n):
+        x = [int(t) for t in reversed(list(bin(b)[2:].zfill(n)))]
+        cost = 0
+        for i in range(n):
+            for j in range(n):
+                cost = cost + w[i,j]*x[i]*(1-x[j])
+                cuts[str(x)]=cost
+    return [max(cuts.values()), min(cuts.values()), min(cuts, key=cuts.get)]
+
+
+def brute_force_random_graph(index, nodes_number, random, graph=None):
+    if graph is None:
+        graph = create_graph(index, nodes_number, random)
+    adjacency_matrix = -nx.adjacency_matrix(graph)
+    return brute_force(adjacency_matrix, nodes_number)
+
+
+
 def goemans_williamson(graph: nx.Graph) -> Tuple[np.ndarray, float, float]:
     """
     The Goemans-Williamson algorithm for solving the maxcut problem.
