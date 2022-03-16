@@ -1,14 +1,15 @@
 import multiprocessing as mp
 import numpy as np
 from time import time
-from exploVQE.newgraph import create_graph, quadratic_program_from_graph
+from exploVQE.newgraph import RandomGraphs
 from exploVQE.resultevaluater import classical_solution, brute_force_random_graph
 from exploVQE.ansatz import var_form, var_form_RY
 from exploVQE.multibase import MultibaseVQA
 from qibo import models, hamiltonians, callbacks, gates
 import qibo
 import pickle
-import networkx as nx
+from math import ceil
+
 
 def classical_solution_finder(starting=0, ending=10, nodes_number=6, random=True, hamiltonian=False):
     """
@@ -39,7 +40,7 @@ def classical_solution_finder(starting=0, ending=10, nodes_number=6, random=True
 def VQE_evaluater(starting=0, ending=10, layer_number=1, nodes_number=6, optimization='COBYLA',
                       graph_list=None,
                       pick_init_parameter=True, random_graphs=False, entanglement='basic', multibase=False):
-    if nodes_number < 14:
+    if nodes_number < 100:
         qibo.set_backend("numpy")
         my_time = time()
         VQE_evaluater_parallel(starting=starting, ending=ending, layer_number=layer_number, nodes_number=nodes_number, optimization=optimization,
@@ -152,8 +153,8 @@ def single_graph_evaluation(index, result_exact=None, layer_number=1, optimizati
                             graph=None,
                             pick_init_parameter=False, random_graphs=False, entanglement='basic'):
     if graph is None:
-        graph = create_graph(index, nodes_number, random_graphs)
-    quadratic_program = quadratic_program_from_graph(graph)
+        graph = RandomGraphs(index, nodes_number, random_graphs).create_graph()
+    quadratic_program = RandomGraphs.quadratic_program_from_graph(graph)
     right_solution = result_exact[2]
     if pick_init_parameter:
         initial_parameters = np.random.normal(0.5, 0.01, 3 * layer_number * nodes_number)
@@ -174,22 +175,21 @@ def single_graph_evaluation_multibase(index, result_exact=None, layer_number=1, 
                             graph=None,
                             pick_init_parameter=False, random_graphs=False, entanglement='basic'):
     if graph is None:
-        graph = create_graph(index, nodes_number, random_graphs)
-    adjacency_matrix = nx.adjacency_matrix(graph)
-    nodes_number = int(nodes_number / 2)
+        graph = RandomGraphs(index, nodes_number, random_graphs).create_graph()
+    print("NUMERO DI QIBIT NECESSARI:",MultibaseVQA.get_num_qubits(nodes_number, 2, 1 / 3))
     if pick_init_parameter:
         ### da sistemare
-        initial_parameters = np.random.normal(0, 1,  (layer_number+1) * nodes_number)
+        initial_parameters = np.random.normal(0, 1, 3*(layer_number+1) * ceil(nodes_number/3))
     else:
         initial_parameters = None
-    circuit = var_form_RY(nodes_number, layer_number, entanglement)
-    solver = MultibaseVQA(circuit, adjacency_matrix)
-    solver.encode_nodes(nodes_number, 1, 1 / 3)
+    circuit = var_form(ceil(nodes_number/3), layer_number, entanglement)
+    solver = MultibaseVQA(circuit, graph)
+    print(solver.encode_nodes(nodes_number, 2, 1 / 3))
     solver.set_activation(np.tanh)
     result, cut, parameters, extra = solver.minimize(initial_parameters, method=optimization, tol=1.11e-6)
-    print(cut, float(result_exact[1]))
-    print((cut - result_exact[0]) / (result_exact[1] - result_exact[0]))
-    return [index, 0, (cut - result_exact[0]) / (result_exact[1] - result_exact[0])]
+    print(cut, float(result_exact[0]))
+    print((cut - result_exact[1]) / (result_exact[0] - result_exact[1]))
+    return [index, 0, (cut - result_exact[1]) / (result_exact[0] - result_exact[1])]
 
 
 def file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,

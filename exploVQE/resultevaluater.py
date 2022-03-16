@@ -4,13 +4,13 @@ import networkx as nx
 import numpy as np
 from numpy import linalg as la
 import cvxpy as cvx
-from exploVQE.newgraph import create_graph, quadratic_program_from_graph
+from exploVQE.newgraph import RandomGraphs
 
 
 def classical_solution(index, nodes_number, random, graph=None):
     if graph is None:
-        graph = create_graph(index, nodes_number, random)
-    quadratic_program = quadratic_program_from_graph(graph)
+        graph = RandomGraphs(index, nodes_number, random).create_graph()
+    quadratic_program = RandomGraphs.quadratic_program_from_graph(graph)
     results = la.eig(quadratic_program)
     return [max(results[0]), min(results[0]), results[1][np.where(results[0] == min(results[0]))]]
 
@@ -83,8 +83,8 @@ def brute_force(w,n):
 
 def brute_force_random_graph(index, nodes_number, random, graph=None):
     if graph is None:
-        graph = create_graph(index, nodes_number, random)
-    adjacency_matrix = -nx.adjacency_matrix(graph)
+        graph = RandomGraphs(index, nodes_number, random).create_graph
+    adjacency_matrix = nx.adjacency_matrix(graph)
     return brute_force(adjacency_matrix, nodes_number)
 
 
