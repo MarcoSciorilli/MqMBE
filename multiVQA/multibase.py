@@ -33,7 +33,8 @@ class MultibaseVQA(object):
         # count number of strings per word length to be used
         num_strings = round((4 ** pauli_string_length - 1) * ratio_total_words)
         # generate list of all indices of given length
-        pauli_strings = list(ndindex(*[4] * pauli_string_length))
+        indices = list(ndindex(*[4] * pauli_string_length))
+        pauli_strings = [x for _, x in sorted(zip([len(i) - i.count(0) for i in indices], indices))]
         # position i stores string corresponding to the i-th node.
         self.node_mapping = [
             get_pauli_word(pauli_strings[int(i % num_strings) + 1], pauli_string_length * floor(i / num_strings)) for i
