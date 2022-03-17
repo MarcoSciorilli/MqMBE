@@ -7,7 +7,7 @@ from scipy import stats
 
 def plotter_layer(nodes, layers, starting=0, ending=50, optimization=['COBYLA'],
                   initial_point='True', random='True', quantity='overlaps', save_fig=None, ylim=(0, 1.1), ansaz=False, entanglement=['linear'] ):
-    #lines = ['-','--','-.',':','.',',','o','v','^','<','>','1','2','3','4','s','p','*','h','H','+','x','D','d','|','_' ]
+
     lines = ['-', '--', '-.', ':', 'None', 'solid', 'dashed', 'dashdot', 'dotted']
     sns.set(rc={'figure.figsize': (12, 9)})
     x = np.array(nodes)

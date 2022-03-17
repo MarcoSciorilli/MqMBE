@@ -7,19 +7,6 @@ import cvxpy as cvx
 from multiVQA.newgraph import RandomGraphs
 
 
-def classical_solution(index, nodes_number, random, graph=None):
-    if graph is None:
-        graph = RandomGraphs(index, nodes_number, random).create_graph()
-    quadratic_program = RandomGraphs.quadratic_program_from_graph(graph)
-    results = la.eig(quadratic_program)
-    return [max(results[0]), min(results[0]), results[1][np.where(results[0] == min(results[0]))]]
-
-
-def classical_solution_no_graph(quadratic_program):
-    hamiltonian = quadratic_program.to_ising()[0].to_matrix()
-    results = la.eig(hamiltonian)
-    return [max(results[0]), min(results[0]), results[1][np.where(results[0] == min(results[0]))]]
-
 def maxcut_cost_fn(graph: nx.Graph, bitstring: List[int]) -> float:
     """
     Computes the maxcut cost function value for a given graph and cut represented by some bitstring
@@ -78,14 +65,12 @@ def brute_force(w,n):
             for j in range(n):
                 cost = cost + w[i,j]*x[i]*(1-x[j])
                 cuts[str(x)]=cost
-    return [max(cuts.values()), min(cuts.values()), min(cuts, key=cuts.get)]
+    return [max(cuts.values()), min(cuts.values()), max(cuts, key=cuts.get)]
 
 
-def brute_force_random_graph(index, nodes_number, random, graph=None):
-    if graph is None:
-        graph = RandomGraphs(index, nodes_number, random).create_graph
+def brute_force_graph(graph=None):
     adjacency_matrix = nx.adjacency_matrix(graph)
-    return brute_force(adjacency_matrix, nodes_number)
+    return brute_force(adjacency_matrix, adjacency_matrix.shape[0])
 
 
 
