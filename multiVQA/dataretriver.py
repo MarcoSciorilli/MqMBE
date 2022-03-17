@@ -1,14 +1,15 @@
 import multiprocessing as mp
 import numpy as np
 from time import time
-from exploVQE.newgraph import RandomGraphs
-from exploVQE.resultevaluater import classical_solution, brute_force_random_graph
-from exploVQE.ansatz import var_form, var_form_RY
-from exploVQE.multibase import MultibaseVQA
+from multiVQA.newgraph import RandomGraphs
+from multiVQA.resultevaluater import classical_solution, brute_force_random_graph
+from multiVQA.ansatz import var_form, var_form_RY
+from multiVQA.multibase import MultibaseVQA
 from qibo import models, hamiltonians, callbacks, gates
 import qibo
 import pickle
-from math import ceil
+import networkx as nx
+from multiVQA.datamanager import insert_value_table, connect_database, create_table
 
 
 def classical_solution_finder(starting=0, ending=10, nodes_number=6, random=True, hamiltonian=False):
@@ -32,7 +33,7 @@ def classical_solution_finder(starting=0, ending=10, nodes_number=6, random=True
     my_results = [r.get() for r in result]
 
     with open(
-            f'exact_solution_n_{nodes_number}_s_{starting}_e_{ending}_random_{random}_hamiltonian_{hamiltonian}.npy',
+            f'exact_solution_n_{nodes_number}_s_{starting}_e_{ending}_random_{random}.npy',
             'wb') as f:
         pickle.dump(my_results, f)
 
@@ -67,17 +68,22 @@ def VQE_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_number=6
         None
 
     """
-    process_number = 1
+
+    process_number = 30
     pool = mp.Pool(process_number)
     overlaps = np.empty(ending - starting)
     energies = np.empty(ending - starting)
+    compression = 1
+    pauli_string_length = 1
+    if multibase:
+        qubits = MultibaseVQA.get_num_qubits(nodes_number, pauli_string_length, compression)
     if graph_list:
         starting = 0
         ending = len(graph_list)
         result_exact = [classical_solution(i, nodes_number, random_graphs, graph=graph_list[i]) for i in
                         range(starting, ending)]
         if multibase:
-            results = [pool.apply_async(single_graph_evaluation_multibase, (i, result_exact[i - starting], layer_number,
+            results = [pool.apply_async(single_graph_evaluation_multibase, (i, qubits, pauli_string_length, compression, result_exact[i - starting], layer_number,
                                                                   optimization, nodes_number, graph_list[i], pick_init_parameter,
                                                                   random_graphs, entanglement)) for i in range(starting, ending)]
         else:
@@ -89,7 +95,7 @@ def VQE_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_number=6
         result_exact = exact_loader(nodes_number, starting, ending, random_graphs)
         start = time()
         if multibase:
-            results = [pool.apply_async(single_graph_evaluation_multibase, (i, result_exact[i - starting], layer_number,
+            results = [pool.apply_async(single_graph_evaluation_multibase, (i,qubits, pauli_string_length, compression, result_exact[i - starting], layer_number,
                                                                   optimization, nodes_number, graph_list, pick_init_parameter,
                                                                   random_graphs, entanglement)) for i in range(starting, ending)]
         else:
@@ -104,9 +110,12 @@ def VQE_evaluater_parallel(starting=0, ending=10, layer_number=1, nodes_number=6
         energies[i] = my_results[i][2]
     pool.close()
     pool.join()
-
-    file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, pick_init_parameter,
-                 random_graphs, average_time, entanglement, multibase)
+    if multibase:
+        file_manager_multibase(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, pick_init_parameter,
+                 random_graphs, qubits, compression, pauli_string_length, entanglement)
+    else:
+        file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, pick_init_parameter,
+                 random_graphs, average_time, entanglement)
 
 
 
@@ -146,7 +155,7 @@ def VQE_evaluater_serial(starting=0, ending=10, layer_number=1, nodes_number=6, 
         energies[i] = my_results[i][2]
 
     file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, pick_init_parameter,
-                 random_graphs, average_time, entanglement, multibase)
+                 random_graphs, average_time, entanglement)
 
 
 def single_graph_evaluation(index, result_exact=None, layer_number=1, optimization='COBYLA', nodes_number=6,
@@ -171,35 +180,91 @@ def single_graph_evaluation(index, result_exact=None, layer_number=1, optimizati
     circuit()
     return [index, float(overlap[0]), (result - result_exact[0]) / (result_exact[1] - result_exact[0])]
 
-def single_graph_evaluation_multibase(index, result_exact=None, layer_number=1, optimization='COBYLA', nodes_number=6,
-                            graph=None,
-                            pick_init_parameter=False, random_graphs=False, entanglement='basic'):
+def single_graph_evaluation(kind, instance, layer_number, nodes_number, optimization= 'COBYLA', initial_parameters = None, compression= 'None', pauli_string_length = 'None', entanglement = 'basic', graph=None, True_random_graphs=False):
     if graph is None:
-        graph = RandomGraphs(index, nodes_number, random_graphs).create_graph()
-    print("NUMERO DI QIBIT NECESSARI:",MultibaseVQA.get_num_qubits(nodes_number, 2, 1 / 3))
-    if pick_init_parameter:
-        ### da sistemare
-        initial_parameters = np.random.normal(0, 1, 3*(layer_number+1) * ceil(nodes_number/3))
+            graph = RandomGraphs(instance, nodes_number, True_random_graphs).graph
+            if True_random_graphs:
+                instance = graph.return_index()
     else:
-        initial_parameters = None
-    circuit = var_form(ceil(nodes_number/3), layer_number, entanglement)
-    solver = MultibaseVQA(circuit, graph)
-    print(solver.encode_nodes(nodes_number, 2, 1 / 3))
+        # Add choosen graph
+        pass
+    if kind == 'bruteforce':
+
+    else:
+        if kind == 'multibaseVQA':
+        if kind == 'classicVQE':
+
+
+
+    row = {'kind':  kind, 'instance': instance, 'solution': solution, 'max_energy': max_energy, 'min_energy': min_energy, 'energy_ratio': energy_ratio , 'overlap': overlap, 'layer_number': layer_number, 'nodes_number': nodes_number, 'optimization': optimization, 'initial_parameters': initial_parameters, 'qubits': qubits, 'compression': compression, 'pauli_string_length': pauli_string_length, 'entanglement': entanglement, 'epochs': epochs, 'time': time, 'parameters': parameters}
+    insert_value_table('MaxCutData', 'MaxCutData', row)
+
+def single_graph_evaluation_multibase(index, qubits, pauli_string_length, compression, result_exact=None, layer_number=1, optimization='COBYLA', nodes_number=6,
+                            graph=None,
+                            initial_parameters=None, True_random_graphs=False, entanglement='basic'):
+
+    if graph is None:
+            graph = RandomGraphs(index, nodes_number, True_random_graphs).graph
+            if True_random_graphs:
+                index = graph.return_index()
+
+    circuit = var_form(qubits, layer_number, entanglement)
+    if initial_parameters is None:
+        initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
+    adjacency_matrix = graph_to_dict(graph)
+    solver = MultibaseVQA(circuit, adjacency_matrix)
+    solver.encode_nodes(nodes_number, pauli_string_length, compression)
     solver.set_activation(np.tanh)
     result, cut, parameters, extra = solver.minimize(initial_parameters, method=optimization, tol=1.11e-6)
-    print(cut, float(result_exact[0]))
-    print((cut - result_exact[1]) / (result_exact[0] - result_exact[1]))
+    print(result)
+    max_energy = cut
+    min_energy = 'None'
+    energy_ratio = (cut - result_exact[1]) / (result_exact[0] - result_exact[1])
+    overlap = 'None'
+    kind = 'Multibase'
+    instance = f'{index}'
+    solution = 'None'
+    epochs = 'None'
+    time = 'None'
+    initial_parameters = 'None'
+    parameters = 'None'
+    row = {'kind':  kind, 'instance': instance, 'solution': solution, 'max_energy': max_energy, 'min_energy': min_energy, 'energy_ratio': energy_ratio , 'overlap': overlap, 'layer_number': layer_number, 'nodes_number': nodes_number, 'optimization': optimization, 'initial_parameters': initial_parameters, 'qubits': qubits, 'compression': compression, 'pauli_string_length': pauli_string_length, 'entanglement': entanglement, 'epochs': epochs, 'time': time, 'parameters': parameters}
+    insert_value_table('MaxCutData', 'MaxCutData', row)
+
     return [index, 0, (cut - result_exact[1]) / (result_exact[0] - result_exact[1])]
 
+def initialize_database(name_database):
+    rows = {'kind': 'TEXT', 'instance': 'TEXT', 'solution': 'TEXT', 'max_energy': 'FLOAT', 'min_energy': 'FLOAT', 'energy_ratio': 'FLOAT' , 'overlap': 'FLOAT', 'layer_number': 'INT', 'nodes_number': 'INT', 'optimization': 'TEXT', 'initial_parameters': 'TEXT', 'qubits': 'INT', 'compression': 'FLOAT', 'pauli_string_length': 'INT', 'entanglement': 'TEXT', 'epochs': 'INT', 'time': 'FLOAT', 'parameters': 'TEXT'}
+    connect_database(name_database)
+    create_table(name_database, name_database, rows)
+
+def graph_to_dict(graph):
+    adjacency_matrix=nx.to_numpy_array(graph)
+    edges = {}
+    for i in range(adjacency_matrix.shape[0]):
+        for j in range(i):
+            if adjacency_matrix[i][j] ==0:
+                continue
+            edges[(i,j)]=adjacency_matrix[i][j]
+    return edges
 
 def file_manager(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,
-                 random, average_time=None, entanglement='basic', multibase=False):
+                 random, average_time=None, entanglement='basic'):
     with open(
-        f'overlap_average_p_{layer_number}_n_{nodes_number}_s_{starting}_e_{ending}_opt_{optimization}_init_{initial_point}_random_{random}_entang_{entanglement}_multibase_{multibase}.npy',
+        f'overlap_average_p_{layer_number}_n_{nodes_number}_s_{starting}_e_{ending}_opt_{optimization}_init_{initial_point}_random_{random}_entang_{entanglement}.npy',
             'wb') as f:
         np.save(f, overlaps)
         np.save(f, energies)
         np.save(f, average_time)
+
+def file_manager_multibase(overlaps, energies, layer_number, nodes_number, starting, ending, optimization, initial_point,
+                 random, qubits, compression, pauli_string_length, entanglement):
+    with open(
+        f'cut_average_p_{layer_number}_n_{nodes_number}_s_{starting}_e_{ending}_opt_{optimization}_init_{initial_point}_random_{random}_entang_{entanglement}_qb_{qubits}_comp_{compression}_pauli_{pauli_string_length}.npy',
+            'wb') as f:
+        np.save(f, overlaps)
+        np.save(f, energies)
+
 
 
 def exact_loader(nodes_number, starting, ending, random):

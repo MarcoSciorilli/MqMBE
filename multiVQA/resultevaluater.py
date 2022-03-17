@@ -4,7 +4,7 @@ import networkx as nx
 import numpy as np
 from numpy import linalg as la
 import cvxpy as cvx
-from exploVQE.newgraph import RandomGraphs
+from multiVQA.newgraph import RandomGraphs
 
 
 def classical_solution(index, nodes_number, random, graph=None):

@@ -6,10 +6,10 @@ import networkx as nx
 class MultibaseVQA(object):
     from qibo import optimizers
 
-    def __init__(self, circuit, graph):
+    def __init__(self, circuit, adjacency_matrix):
         self.activation_function = None
         self.circuit = circuit
-        self.adjacency_matrix = nx.to_numpy_array(graph)
+        self.adjacency_matrix = adjacency_matrix
 
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
@@ -52,11 +52,9 @@ class MultibaseVQA(object):
             circuit.set_parameters(params)
             final_state = circuit()
             loss = 0
-            for i, row in enumerate(self.adjacency_matrix):
-                for j, weight in enumerate(row):
-                    if i < j:
-                        loss += weight * activation_function(self.node_mapping[i].expectation(final_state)) \
-                                 * activation_function(self.node_mapping[j].expectation(final_state))
+            for i in self.adjacency_matrix:
+                loss += self.adjacency_matrix[i] * activation_function(self.node_mapping[i[0]].expectation(final_state)) \
+                         * activation_function(self.node_mapping[i[1]].expectation(final_state))
 
             return loss
 
@@ -65,13 +63,10 @@ class MultibaseVQA(object):
             circuit.set_parameters(params)
             final_state = circuit()
             cut_value = 0
-            for i, row in enumerate(self.adjacency_matrix):
-                for j, weight in enumerate(row):
-                    if i < j:
-                        # print(f'{_round(self.node_mapping[i].expectation(final_state))} and {_round(self.node_mapping[j].expectation(final_state))}')
-                        cut_value += weight * (1 \
-                                               - _round(self.node_mapping[i].expectation(final_state)) \
-                                               * _round(self.node_mapping[j].expectation(final_state))) / 2
+            for i in self.adjacency_matrix:
+                cut_value += self.adjacency_matrix[i] * (1 \
+                                       - _round(self.node_mapping[i[0]].expectation(final_state)) \
+                                       * _round(self.node_mapping[i[1]].expectation(final_state))) / 2
 
             return cut_value
 

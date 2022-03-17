@@ -22,7 +22,7 @@ def plotter_layer(nodes, layers, starting=0, ending=50, optimization=['COBYLA'],
                     total_errors_energies = np.empty(len(layers))
                     for j in range(len(layers)):
                         with open(
-                                f'overlap_average_p_{layers[j]}_n_{nodes[i]}_s_{starting}_e_{ending}_opt_{opt}_init_{initial_point}_random_{random}_entang_{entan}.npy',
+                                f'cut_average_p_{layers[j]}_n_{nodes[i]}_s_{starting}_e_{ending}_opt_{opt}_init_{initial_point}_random_{random}_entang_{entan}_qb_2_comp_1_pauli_2.npy',
                                 'rb') as f:
                             overlap = np.load(f)
                             energies = np.load(f)

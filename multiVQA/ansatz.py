@@ -1,7 +1,6 @@
 from qibo import models, gates
 from qibo import callbacks
 
-
 def circuit_none(size=6):
     """
     Given a QUBO instance and the number of layers p, costruct a circuit made of only a layer of Hadamard gates.
@@ -13,8 +12,6 @@ def circuit_none(size=6):
     c = models.Circuit(size)
     c.add((gates.H(q) for q in range(size)))
     return c
-
-
 
 def var_form(size = 6, p: int = 0, entanglement='basic'):
     c = models.Circuit(size)

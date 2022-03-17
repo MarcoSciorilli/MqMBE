@@ -7,12 +7,15 @@ from itertools import combinations, groupby
 
 
 class RandomGraphs(object):
-    def __init__(self, index: int, nodes_number: int, random: Optional[bool],
+    def __init__(self, index: int, nodes_number: int, true_random: Optional[bool] = False,
                  softmax: Optional[bool] = False):
         self.index = index
         self.nodes_number = nodes_number
-        self.random = random
+        if true_random:
+            np.random.seed(np.randint(0))
+            self.index = np.randint(0)
         self.softmax = softmax
+        self.graph = self.create_graph()
 
     @staticmethod
     def complete_graph_instantiater(number: int = 50, size: int = 10) -> List:
@@ -136,11 +139,13 @@ class RandomGraphs(object):
         # Initialise the probability of each node of having an edge with a neighbour
         p = 1
         # Fix the probability if the same seed is used
-        if self.random:
-            np.random.seed(self.index)
-            p = np.random.uniform(0, 1)
+        np.random.seed(self.index)
+        p = np.random.uniform(0, 1)
         # Create the graph unweighted
         dummy_graph = self.gnp_random_connected_graph(self.nodes_number, p, self.index)
         # Assign weight to the edges
         graph = self.weighted_graph(dummy_graph, seed=self.index, softmax=self.softmax)
         return graph
+
+    def return_index(self):
+        return self.index
