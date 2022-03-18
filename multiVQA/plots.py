@@ -4,13 +4,70 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import stats
+from multiVQA.datamanager import read_data
+
+def plotter(x, y, instances, trials, flags, fixed, save_fig=None, ylim=(0, 1.1)):
+    lines = ['-', '--', '-.', ':', 'None', 'solid', 'dashed', 'dashdot', 'dotted']
+    sns.set(rc={'figure.figsize': (12, 9)})
+    x_array = np.array(x[0])
+    line_counter = 0
+    for label in flags:
+        line_counter += 1
+        for flag in flags[label]:
+            fixed_labels = fixed
+            fixed_labels[flags[0]] = flag
+            for i in x[0]:
+                fixed_labels[x[0]]=i
+                average_y = np.empty(len(x))
+                error_y= np.empty(len(x))
+                for j in instances:
+                    fixed_labels['instances'] = j
+                    y_instance = read_data('MaxCutDatabase', 'MaxCutDatabase', [y], fixed_labels)
+                average_y[i] = statistics.mean(y_instance)
+                error_y[i] = stats.sem(y_instance, ddof=0)
+                plt.plot(x_array, average_y, label=f'{flags[label]}:{flag}',  linestyle=lines[line_counter])
+                plt.fill_between(x_array, average_y - error_y, error_y + error_y, alpha=0.2)
+
+
+    # if ansaz:
+    #     plt.plot(layers, [ansaz_function(l, nodes[i]) for l in layers], alpha=0.9, linestyle='--',
+    #              label=f"Ansaz for nodes n={nodes[i]}")
+
+
+    plt.xticks(x_array)
+    plt.xlim(min(x_array), max(x_array))
+    plt.ylim(ylim)
+    plt.xlabel(f"{x[0]}", fontsize=18)
+    plt.ylabel(f"Average {y}  over {len(instances)} graphs", fontsize=18)
+    if save_fig:
+        plt.savefig(f"{save_fig}.svg")
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def plotter_layer(nodes, layers, starting=0, ending=50, optimization=['COBYLA'],
                   initial_point='True', random='True', quantity='overlaps', save_fig=None, ylim=(0, 1.1), ansaz=False, entanglement=['linear'] ):
 
     lines = ['-', '--', '-.', ':', 'None', 'solid', 'dashed', 'dashdot', 'dotted']
     sns.set(rc={'figure.figsize': (12, 9)})
-    x = np.array(nodes)
     opt_num,entan_num = -1, -1
     for opt in optimization:
         opt_num += 1

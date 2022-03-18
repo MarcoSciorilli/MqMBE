@@ -54,6 +54,8 @@ def single_graph_evaluation(kind, instance,  nodes_number,layer_number, optimiza
     insert_value_table('MaxCutDatabase', 'MaxCutDatabase', row)
 
 
+
+
 def benchmarker(kind,  nodes_number, starting, ending, layer_number='None', optimization= 'None', initial_parameters = 'None', compression= 'None', pauli_string_length = 'None', entanglement = 'None', graph_list=None, graph_kind='indexed'):
     if nodes_number < 100:
         qibo.set_backend("numpy")
