@@ -5,21 +5,25 @@ def connect_database(name_database):
     return conn
 
 
-def create_table(name_database, name_table, rows):
+def create_table(name_database, name_table, rows, unique):
     connection = connect_database(name_database)
-    string_creation = create_table_string(name_table, rows)
+    string_creation = create_table_string(name_table, rows, unique)
     cursor = connection.cursor()
     cursor.execute(string_creation)
     cursor.close()
 
 
-def create_table_string(name_table, rows):
+def create_table_string(name_table, rows, unique):
     string = f'CREATE TABLE {name_table}('
     for i in rows:
         string = string + f'{i} {rows[i]}, '
+
+    string = string + 'UNIQUE( '
+    for j in unique:
+        string = string + f'{j}, '
     size = len(string)
     string = string[:size - 2]
-    string = string + ')'
+    string = string + '))'
     return string
 
 
@@ -33,7 +37,7 @@ def insert_value_table(name_database, name_table, row):
 
 
 def create_insertion_string(name_table, row):
-    string = f'INSERT INTO {name_table} ('
+    string = f'INSERT OR REPLACE INTO {name_table} ( '
     for i in row:
         string = string + f'{i}, '
     size = len(string)
@@ -47,7 +51,7 @@ def create_insertion_string(name_table, row):
             string = string + f'{row[i]}, '
     size = len(string)
     string = string[:size - 2]
-    string = string + ');'
+    string = string + ')'
     return string
 
 

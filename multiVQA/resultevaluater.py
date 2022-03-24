@@ -1,10 +1,7 @@
-from typing import List
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import networkx as nx
 import numpy as np
-from numpy import linalg as la
 import cvxpy as cvx
-from multiVQA.newgraph import RandomGraphs
 
 
 def maxcut_cost_fn(graph: nx.Graph, bitstring: List[int]) -> float:
@@ -17,6 +14,9 @@ def maxcut_cost_fn(graph: nx.Graph, bitstring: List[int]) -> float:
         The value of the cut
     """
     # Get the weight matrix of the graph
+    for i in range(len(bitstring)):
+        if bitstring[i] < 0:
+            bitstring[i] = 0
     weight_matrix = nx.adjacency_matrix(graph).toarray()
     size = weight_matrix.shape[0]
     value = 0.
@@ -25,20 +25,6 @@ def maxcut_cost_fn(graph: nx.Graph, bitstring: List[int]) -> float:
             value += weight_matrix[i, j] * bitstring[i] * (1 - bitstring[j])
 
     return value
-
-def maxcut_find_solution(graph: nx.Graph) -> None:
-    """
-    Return the best cut as a bitstring of the solution and its cost value
-    Args:
-        graph: The graph to compute cut values for
-    """
-    num_vars = graph.number_of_nodes()
-    # Create list of bitstrings and corresponding cut values
-    bitstrings = ['{:b}'.format(i).rjust(num_vars, '0')[::-1] for i in range(2 ** num_vars)]
-    values = [maxcut_cost_fn(graph=graph, bitstring=[int(x) for x in bitstring]) for bitstring in bitstrings]
-    # Sort both lists by largest cut value
-    #values, bitstrings = zip(*sorted(zip(values, bitstrings)))
-    return values
 
 def get_overlap(vector_1, vector_2):
     """
@@ -65,7 +51,7 @@ def brute_force(w,n):
             for j in range(n):
                 cost = cost + w[i,j]*x[i]*(1-x[j])
                 cuts[str(x)]=cost
-    return [max(cuts.values()), min(cuts.values()), max(cuts, key=cuts.get)]
+    return [max(cuts.values()), min(cuts.values()), max(cuts, key=cuts.get).replace('0', '-1')]
 
 
 def brute_force_graph(graph=None):
@@ -73,21 +59,19 @@ def brute_force_graph(graph=None):
     return brute_force(adjacency_matrix, adjacency_matrix.shape[0])
 
 
-
-def goemans_williamson(graph: nx.Graph) -> Tuple[np.ndarray, float, float]:
+def goemans_williamson(graph: nx.Graph):
     """
     The Goemans-Williamson algorithm for solving the maxcut problem.
     Ref:
         Goemans, M.X. and Williamson, D.P., 1995. Improved approximation
         algorithms for maximum cut and satisfiability problems using
-        semidefinite programming. Journal of the ACM (JACM), 42(6), 1115-1145
+        semidefinite programming
     Returns:
         np.ndarray: Graph coloring (+/-1 for each node)
         float:      The GW score for this cut.
         float:      The GW bound from the SDP relaxation
     """
-    # Kudos: Originally implementation by Nick Rubin, with refactoring and
-    # cleanup by Jonathon Ward and Gavin E. Crooks
+
     laplacian = np.array(0.25 * nx.laplacian_matrix(graph).todense())
 
     # Setup and solve the GW semidefinite programming problem
@@ -97,15 +81,14 @@ def goemans_williamson(graph: nx.Graph) -> Tuple[np.ndarray, float, float]:
     prob = cvx.Problem(obj, constraints)
     prob.solve(solver=cvx.CVXOPT)
 
+
     evals, evects = np.linalg.eigh(psd_mat.value)
     sdp_vectors = evects.T[evals > float(1.0E-6)].T
 
     # Bound from the SDP relaxation
     bound = np.trace(laplacian @ psd_mat.value)
-
     random_vector = np.random.randn(sdp_vectors.shape[1])
     random_vector /= np.linalg.norm(random_vector)
     colors = np.sign([vec @ random_vector for vec in sdp_vectors])
-    score = colors @ laplacian @ colors.T
-
-    return colors, score, bound
+    #score = colors @ laplacian @ colors.T
+    return [colors.astype(int), maxcut_cost_fn(graph, colors.copy())]

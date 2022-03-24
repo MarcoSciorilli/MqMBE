@@ -16,6 +16,10 @@ class MultibaseVQA(object):
         # return the number of qubits necessary
         return int(ceil(num_nodes / round((4 ** pauli_string_length - 1) * ratio_total_words)) * pauli_string_length)
 
+    @staticmethod
+    def linear_activation(x):
+        return x
+
     def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words):
 
         def get_pauli_word(indices, k):
@@ -71,6 +75,12 @@ class MultibaseVQA(object):
 
             return cut_value
 
+        def _retrive_solution(params, circuit):
+            circuit.set_parameters(params)
+            final_state = circuit()
+            first_part = [node.expectation(final_state) for node in self.node_mapping]
+            return first_part
+
         def _round(num):
             if num > 0:
                 return +1
@@ -85,7 +95,7 @@ class MultibaseVQA(object):
                                                              bounds=bounds, constraints=constraints,
                                                              tol=tol, callback=callback, options=options,
                                                              processes=processes)
-
+        solution = _retrive_solution(parameters, self.circuit)
         cut_value = _cut_value(parameters, self.circuit)
         self.circuit.set_parameters(parameters)
-        return result, cut_value, parameters, extra
+        return result, cut_value, parameters, extra, solution, [_round(i) for i in solution]
