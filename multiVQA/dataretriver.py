@@ -10,7 +10,7 @@ import networkx as nx
 from multiVQA.datamanager import insert_value_table, connect_database, create_table, read_data
 
 def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, optimization, initial_parameters,
-                            compression, pauli_string_length, entanglement, graph, graph_kind, activation_function):
+                            ratio_total_words, pauli_string_length, entanglement, graph, graph_kind, activation_function):
     if graph is None:
         true_random_graphs = False
 
@@ -40,21 +40,25 @@ def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, o
             timing = my_time - time()
             max_energy, solution = result[1], str(result[0])
             energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
-            qubits, compression, pauli_string_length, epochs, parameters, number_parameters, activation_function, unrounded_solution, min_energy = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None'
+            qubits, ratio_total_words, pauli_string_length, epochs, parameters, number_parameters, activation_function, unrounded_solution, min_energy = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None'
         else:
             adjacency_matrix = graph_to_dict(graph)
             if kind == 'classicVQE':
                 pauli_string_length = 1
-                compression = 1 / 3
+                ratio_total_words = 1 / 3
                 activation_function = MultibaseVQA.linear_activation()
 
-            qubits = MultibaseVQA.get_num_qubits(nodes_number, pauli_string_length, compression)
+            qubits = MultibaseVQA.get_num_qubits(nodes_number, pauli_string_length, ratio_total_words)
             circuit = var_form(qubits, layer_number, entanglement)
 
             if initial_parameters == 'None':
                 initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
             solver = MultibaseVQA(circuit, adjacency_matrix)
-            solver.encode_nodes(nodes_number, pauli_string_length, compression)
+            if ratio_total_words == 1:
+                solver.encode_nodes(nodes_number, pauli_string_length, ratio_total_words)
+            else:
+                solver.encode_nodes(nodes_number, pauli_string_length, ratio_total_words, compression=2)
+
             solver.set_activation(activation_function)
             my_time = time()
             result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters, method=optimization, options={'maxiter':1000000000})
@@ -75,7 +79,7 @@ def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, o
 
     row = {'kind': kind, 'instance': instance, 'trial': trial, 'layer_number': layer_number,
            'nodes_number': nodes_number, 'optimization': optimization, 'activation_function': str(activation_function),
-           'compression': compression, 'pauli_string_length': pauli_string_length, 'entanglement': entanglement,
+           'compression': ratio_total_words, 'pauli_string_length': pauli_string_length, 'entanglement': entanglement,
            'graph_kind': graph_kind, 'qubits': qubits, 'solution': solution, 'unrounded_solution': unrounded_solution,
            'max_energy': max_energy, 'min_energy': min_energy, 'energy_ratio': energy_ratio,
            'initial_parameters': initial_parameters, 'parameters': parameters, 'number_parameters': number_parameters,
@@ -84,37 +88,37 @@ def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, o
 
 
 def benchmarker(kind, nodes_number, starting, ending, trials=1, layer_number='None', optimization='None',
-                initial_parameters='None', compression='None', pauli_string_length='None', entanglement='None',
+                initial_parameters='None', ratio_total_words='None', pauli_string_length='None', entanglement='None',
                 graph_dict=None, graph_kind='indexed', activation_function=np.tanh):
-    if nodes_number < 100:
+    if nodes_number < 1:
         qibo.set_backend("numpy")
         my_time = time()
         eignensolver_evaluater_parallel(kind, nodes_number, starting, ending, trials, layer_number, optimization,
-                                        initial_parameters, compression, pauli_string_length, entanglement, graph_dict,
+                                        initial_parameters, ratio_total_words, pauli_string_length, entanglement, graph_dict,
                                         graph_kind, activation_function)
         print("Total time:", time() - my_time)
     else:
         qibo.set_backend("numpy")
         my_time = time()
         eignensolver_evaluater_serial(kind, nodes_number, starting, ending, trials, layer_number, optimization,
-                                      initial_parameters, compression, pauli_string_length, entanglement, graph_dict,
+                                      initial_parameters, ratio_total_words, pauli_string_length, entanglement, graph_dict,
                                       graph_kind, activation_function)
         print("Total time:", time() - my_time)
 
 
 def eignensolver_evaluater_parallel(kind, nodes_number, starting, ending, trials, layer_number, optimization,
-                                    initial_parameters, compression, pauli_string_length, entanglement, graph_dict,
+                                    initial_parameters, ratio_total_words, pauli_string_length, entanglement, graph_dict,
                                     graph_kind, activation_function):
     process_number = 35
     pool = mp.Pool(process_number)
     if graph_dict is not None:
         results = [pool.apply_async(single_graph_evaluation, (
-            'bruteforce', instance, trials, nodes_number, layer_number, optimization, initial_parameters, compression,
+            'bruteforce', instance, trials, nodes_number, layer_number, optimization, initial_parameters, ratio_total_words,
             pauli_string_length, entanglement, graph_dict[instance], instance, activation_function)) for instance in
                    graph_dict if graph_dict[instance].number_of_nodes() < 20]
     for trial in range(trials):
         results = [pool.apply_async(single_graph_evaluation, (
-            kind, instance, trial, nodes_number, layer_number, optimization, initial_parameters, compression,
+            kind, instance, trial, nodes_number, layer_number, optimization, initial_parameters, ratio_total_words,
             pauli_string_length, entanglement, graph_dict, graph_kind, activation_function)) for instance in
                    range(starting, ending)]
     pool.close()
@@ -122,19 +126,19 @@ def eignensolver_evaluater_parallel(kind, nodes_number, starting, ending, trials
 
 
 def eignensolver_evaluater_serial(kind, nodes_number, starting, ending, trials, layer_number, optimization,
-                                  initial_parameters, compression, pauli_string_length, entanglement, graph_dict,
+                                  initial_parameters, ratio_total_words, pauli_string_length, entanglement, graph_dict,
                                   graph_kind, activation_function):
     if graph_dict is not None:
         for instance in graph_dict:
             if graph_dict[instance].number_of_nodes() < 20:
                 single_graph_evaluation(
                     'bruteforce', instance, trials, nodes_number, layer_number, optimization, initial_parameters,
-                    compression,
+                    ratio_total_words,
                     pauli_string_length, entanglement, graph_dict[instance], instance, activation_function)
     for trial in range(trials):
         for instance in range(starting, ending):
             single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, optimization, initial_parameters,
-                                    compression, pauli_string_length, entanglement, graph_dict, graph_kind,
+                                    ratio_total_words, pauli_string_length, entanglement, graph_dict, graph_kind,
                                     activation_function)
 
 

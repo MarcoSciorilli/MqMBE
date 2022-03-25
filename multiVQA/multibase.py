@@ -2,6 +2,7 @@ from numpy.random import uniform, randint
 from numpy import ceil, floor, ndindex
 from qibo.symbols import X, Y, Z
 import networkx as nx
+from itertools import combinations
 
 class MultibaseVQA(object):
     from qibo import optimizers
@@ -20,7 +21,7 @@ class MultibaseVQA(object):
     def linear_activation(x):
         return x
 
-    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words):
+    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words, compression=None):
 
         def get_pauli_word(indices, k):
             # Generate pauli string corresponding to indices
@@ -34,19 +35,37 @@ class MultibaseVQA(object):
                 word *= pauli_matrices[i](qubit + int(k))
             return hamiltonians.SymbolicHamiltonian(word)
 
-        # count number of strings per word length to be used
-        num_strings = round((4 ** pauli_string_length - 1) * ratio_total_words)
-        # generate list of all indices of given length
-        indices = list(ndindex(*[4] * pauli_string_length))
-        pauli_strings = [x for _, x in sorted(zip([len(i) - i.count(0) for i in indices], indices))]
+
+        if compression is None:
+            # count number of strings per word length to be used
+            num_strings = round((4 ** pauli_string_length - 1) * ratio_total_words)
+            # generate list of all indices of given length
+            indices = list(ndindex(*[4] * pauli_string_length))
+            pauli_strings = [x for _, x in sorted(zip([len(i) - i.count(0) for i in indices], indices))]
+        else:
+            pauli_strings = self._pauli_string(pauli_string_length, compression)
+            num_strings = len(pauli_strings)
         # position i stores string corresponding to the i-th node.
         self.node_mapping = [
-            get_pauli_word(pauli_strings[int(i % num_strings) + 1], pauli_string_length * floor(i / num_strings)) for i
+            get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
             in range(num_nodes)]
         return ceil(num_nodes / num_strings)
 
     def set_activation(self, function):
         self.activation_function = function
+
+    def _pauli_string(self, pauli_string_length, compression):
+        pauli_string = []
+        for i in range(1, 4):
+            for k in range(1, compression+1):
+                comb=combinations(list(range(pauli_string_length)), k)
+                for positions in comb:
+                    instance = [0] * pauli_string_length
+                    for index in positions:
+                        instance[index] = i
+                    pauli_string.append(tuple(instance))
+
+        return pauli_string
 
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
