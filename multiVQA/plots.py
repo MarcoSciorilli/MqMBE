@@ -55,7 +55,66 @@ def plotter(x, y, flags, fixed,instances=None, save_fig=None, ylim=(0, 1.1)):
         plt.savefig(f"{save_fig}.svg")
     plt.show()
 
+def plotter_compare(x, y, flags, fixed, compares, pick_method= 'average', instances=None, save_fig=None, ylim=(0, 1.1)):
+    sns.set(rc={'figure.figsize': (12, 9)})
+    x_array = np.array(x[1])
+    color = iter(cm.rainbow(np.linspace(0, 1, 5)))
+    for flag in flags[1]:
+        average_y = np.empty(len(x[1]))
+        error_y= np.empty(len(x[1]))
+        for i in x[1]:
+            fixed_labels = fixed
+            fixed_labels[flags[0]] = flag
+            total_y = []
+            for term in compares[1]:
+                if term == 'goemans_williamson':
+                    name_database= 'MaxCutDatabase_gw'
+                    fixed_labels = {'optimization': 'None', 'qubits': 'None', 'entanglement': 'None', 'graph_kind': 'indexed', 'activation_function': 'None'}
+                    fixed_labels[flags[0]] = flag
+                else:
+                    name_database = 'MaxCutDatabase'
+                    fixed_labels[x[0]] = i
+                    fixed_labels['qubits'] = solve_quadratic(1, 1,-flag*2/3)
+                    #fixed_labels['compression'] = int(1)
+                fixed_labels[compares[0]] = term
+                if instances:
+                    data_y = []
+                    for j in instances:
+                        fixed_labels['instance'] = j
+                        y_instance = read_data(name_database, 'MaxCutDatabase', [compares[0], y, 'instance', 'trial'], fixed_labels)
+                        data_y.append(y_instance[0][0])
+                else:
+                    data_y = read_data(name_database, 'MaxCutDatabase', [compares[0], y, 'instance', 'trial'], fixed_labels)
+                data_y = pd.DataFrame(data_y, columns=[compares[0], y,  'instance', 'trial'])
+                total_y.append(data_y)
+            total_y = pd.concat(total_y)
+            if pick_method == 'average':
+                total_y = total_y.groupby(['instance', compares[0]], as_index=False ).mean()
+            else:
+                total_y = total_y.groupby(['instance', compares[0]], as_index=False).max()
+            total_y_ratio = [float(total_y[(total_y['instance']== f'{i}') & (total_y[compares[0]]== compares[1][0])]['max_energy'])/float(total_y[(total_y['instance']== f'{i}') & (total_y[compares[0]]== compares[1][1])]['max_energy']) for i in range(int(len(total_y)/2))]
+            average_y[i] = statistics.mean(total_y_ratio)
+            error_y[i] = stats.sem(total_y_ratio, ddof=0)
+        print('Averages y:',average_y, "Errors y:", error_y)
+        c = next(color)
+        plt.plot(x_array, average_y, label=f'{flag}', color=c)
+        plt.fill_between(x_array, average_y - error_y, average_y + error_y, alpha=0.2, color=c)
 
+
+    # if ansaz:
+    #     plt.plot(layers, [ansaz_function(l, nodes[i]) for l in layers], alpha=0.9, linestyle='--',
+    #              label=f"Ansaz for nodes n={nodes[i]}")
+
+    plt.legend(title=f'{flags[0]}')
+    plt.xticks(x_array)
+    plt.xlim(min(x_array), max(x_array))
+    plt.ylim(ylim)
+    plt.xlabel(f"{x[0]}", fontsize=18)
+    plt.ylabel(f"Cut ratio", fontsize=18)
+    plt.title(f"Average cut ratio (multibase/goeman) over {int(len(total_y)/2)} graphs, 5 trials for instance", fontsize=18)
+    if save_fig:
+        plt.savefig(f"{save_fig}.svg")
+    plt.show()
 
 
 

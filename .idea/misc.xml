@@ -17,8 +17,12 @@
           <option name="fileUrl" value="file://$PROJECT_DIR$/multiVQA/ansatz.py" />
         </OpenedFileInfo>
         <OpenedFileInfo>
-          <option name="caretOffset" value="399" />
+          <option name="caretOffset" value="398" />
           <option name="fileUrl" value="file://$PROJECT_DIR$/multiVQA/dataretriver.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="0" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/multiVQA/plots.py" />
         </OpenedFileInfo>
       </list>
     </option>
