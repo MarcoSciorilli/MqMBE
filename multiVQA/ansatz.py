@@ -15,11 +15,18 @@ def circuit_none(size=6):
 
 def var_form(size = 6, p: int = 0, entanglement='basic'):
     c = models.Circuit(size)
-    c.add(gates.U3(q, theta=0, phi=0, lam=0,trainable=True) for q in range(size))
+    c.add(gates.U3(q, theta=0,phi=0, lam=0, trainable=True) for q in range(size))
     if entanglement == 'basic':
         for l in range(1, p+1):
             c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
-            c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
+            if size % 2:
+                c.add(gates.CZ(q, q + 1) for q in range(1, size, 2))
+                c.add(gates.CZ(size-1, 0))
+            else:
+                c.add(gates.CZ(size-1, 0))
+                c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
+
+
             c.add(gates.U3(q, theta=0, phi=0, lam=0,trainable=True) for q in range(size))
     if entanglement == 'interleaved':
         for l in range(1, p+1):
@@ -33,12 +40,30 @@ def var_form(size = 6, p: int = 0, entanglement='basic'):
                 c.add(gates.CZ(k, k+1))
             c.add(gates.U3(q, theta=0, phi=0, lam=0) for q in range(size))
 
-    if entanglement == 'circular':
+    if entanglement == 'non-circular':
         for l in range(1,p+1):
-            c.add(gates.CZ(size-1, 0))
-            for k in range(size-1):
-                c.add((gates.CZ(k, k+1)))
-            c.add(gates.U3(q, theta=0, phi=0, lam=0) for q in range(size))
+            c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
+            if size % 2:
+                c.add(gates.CZ(q, q + 1) for q in range(1, size, 2))
+                c.add(gates.CZ(size-1, 0))
+            else:
+                c.add(gates.CZ(size-1, 0))
+                c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
+
+
+            c.add(gates.U3(q, theta=0, phi=0, lam=0,trainable=True) for q in range(size))
+
+    if entanglement == 'article':
+        for l in range(1,p+1):
+            c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
+            if size % 2:
+                c.add(gates.CZ(q, q + 1) for q in range(1, size, 2))
+                c.add(gates.CZ(size-1, 0))
+            else:
+                c.add(gates.CZ(size-1, 0))
+                c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
+            c.add(gates.RY(q, theta=0,trainable=True) for q in range(size))
+
 
     if entanglement == 'circular-interleaved':
         for l in range(1,p+1):

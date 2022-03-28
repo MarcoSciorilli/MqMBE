@@ -50,7 +50,6 @@ def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, o
 
             qubits = MultibaseVQA.get_num_qubits(nodes_number, pauli_string_length, ratio_total_words)
             circuit = var_form(qubits, layer_number, entanglement)
-
             if initial_parameters == 'None':
                 initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
             solver = MultibaseVQA(circuit, adjacency_matrix)
@@ -90,7 +89,7 @@ def single_graph_evaluation(kind, instance, trial, nodes_number, layer_number, o
 def benchmarker(kind, nodes_number, starting, ending, trials=1, layer_number='None', optimization='None',
                 initial_parameters='None', ratio_total_words='None', pauli_string_length='None', entanglement='None',
                 graph_dict=None, graph_kind='indexed', activation_function=np.tanh):
-    if nodes_number < 1:
+    if nodes_number < 100:
         qibo.set_backend("numpy")
         my_time = time()
         eignensolver_evaluater_parallel(kind, nodes_number, starting, ending, trials, layer_number, optimization,
@@ -109,7 +108,7 @@ def benchmarker(kind, nodes_number, starting, ending, trials=1, layer_number='No
 def eignensolver_evaluater_parallel(kind, nodes_number, starting, ending, trials, layer_number, optimization,
                                     initial_parameters, ratio_total_words, pauli_string_length, entanglement, graph_dict,
                                     graph_kind, activation_function):
-    process_number = 35
+    process_number = 100
     pool = mp.Pool(process_number)
     if graph_dict is not None:
         results = [pool.apply_async(single_graph_evaluation, (
