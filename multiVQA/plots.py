@@ -6,7 +6,8 @@ import seaborn as sns
 from scipy import stats
 from multiVQA.datamanager import read_data
 from matplotlib.pyplot import cm
-
+import pandas as pd
+import cmath
 
 def plotter(x, y, flags, fixed,instances=None, save_fig=None, ylim=(0, 1.1)):
     lines = ['-', '--', '-.', ':']
@@ -116,7 +117,13 @@ def plotter_compare(x, y, flags, fixed, compares, pick_method= 'average', instan
         plt.savefig(f"{save_fig}.svg")
     plt.show()
 
+def solve_quadratic(a, b, c):
+    d = (b ** 2) - (4 * a * c)
 
+    # find two solutions
+    sol1 = (-b - cmath.sqrt(d)) / (2 * a)
+    sol2 = (-b + cmath.sqrt(d)) / (2 * a)
+    return max( sol1.real, sol2.real)
 
 def ansaz_function(p, n):
     return 2 ** (-(0.18 / (p) + 0.52) * (n / np.log(2)) +1.24)

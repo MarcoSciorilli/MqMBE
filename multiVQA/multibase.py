@@ -42,13 +42,16 @@ class MultibaseVQA(object):
             # generate list of all indices of given length
             indices = list(ndindex(*[4] * pauli_string_length))
             pauli_strings = [x for _, x in sorted(zip([len(i) - i.count(0) for i in indices], indices))]
+            self.node_mapping = [
+                get_pauli_word(pauli_strings[int(i % num_strings+1)], pauli_string_length * floor(i / num_strings)) for i
+                in range(num_nodes)]
         else:
             pauli_strings = self._pauli_string(pauli_string_length, compression)
             num_strings = len(pauli_strings)
         # position i stores string corresponding to the i-th node.
-        self.node_mapping = [
-            get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
-            in range(num_nodes)]
+            self.node_mapping = [
+                get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
+                in range(num_nodes)]
         return ceil(num_nodes / num_strings)
 
     def set_activation(self, function):
