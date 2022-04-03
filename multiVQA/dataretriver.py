@@ -31,20 +31,23 @@ class Benchmarker(object):
         self.graph_dict = graph_dict
         self.graph_kind = graph_kind
         self.activation_function = activation_function
+        if pauli_string_length != None:
+            self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
+                                        self.ratio_total_words)
 
-        if nodes_number < 100:
-            qibo.set_backend("qibojit", platform="numba")
+        if self.qubits < 10:
+            qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
             print("Total time:", time() - my_time)
         else:
-            qibo.set_backend("qibojit", platform="numba")
+            qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_serial()
             print("Total time:", time() - my_time)
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 100
+        process_number = 1
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             self.kind = 'bruteforce'
@@ -52,9 +55,8 @@ class Benchmarker(object):
                                                               self.graph_dict[instance])) for instance in
              self.graph_dict if self.graph_dict[instance].number_of_nodes() < 20]
             # add the non-brute force
-        for trial in range(self.trials):
-            [pool.apply_async(self._single_graph_evaluation, (instance, trial, self.graph_dict)) for instance in
-             range(self.starting, self.ending)]
+        [pool.apply_async(self._single_graph_evaluation, (instance, trial, self.graph_dict)) for instance in
+             range(self.starting, self.ending) for trial in range(self.trials)]
         pool.close()
         pool.join()
 
@@ -116,8 +118,7 @@ class Benchmarker(object):
                     self.ratio_total_words = 1 / 3
                     self.activation_function = MultibaseVQA.linear_activation()
 
-                qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
-                                                     self.ratio_total_words)
+                qubits = self.qubits
                 circuit = var_form(qubits, self.layer_number, self.entanglement)
                 if self.initial_parameters == 'None':
                     initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
@@ -142,7 +143,7 @@ class Benchmarker(object):
                 print(timing)
                 if self.optimization == 'cma':
                     epochs = extra[1].result[3]
-                else:
+                elif self.optimization != 'sgd':
                     epochs = extra['nfev']
 
                 max_energy, min_energy, number_parameters, initial_parameters, parameters, unrounded_solution, solution = cut, 'None', len(

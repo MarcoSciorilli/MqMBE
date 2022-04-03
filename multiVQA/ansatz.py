@@ -1,3 +1,5 @@
+import math
+
 from qibo import models, gates
 from qibo import callbacks
 
@@ -15,7 +17,11 @@ def circuit_none(size: int = 6) -> models.Circuit:
 
 def var_form(size=6, p: int = 0, entanglement='basic'):
     c = models.Circuit(size)
-    c.add(gates.U3(q, theta=0, phi=0, lam=0, trainable=True) for q in range(size))
+    c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
+    c.add(gates.RX(q, theta=-math.pi/2, trainable=False) for q in range(size))
+    c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
+    c.add(gates.RX(q, theta=math.pi/2, trainable=False) for q in range(size))
+    c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
     if entanglement == 'circular':
         for l in range(1, p + 1):
             c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
@@ -73,6 +79,22 @@ def var_form(size=6, p: int = 0, entanglement='basic'):
                 else:
                     c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
             c.add(gates.RY(q, theta=0, trainable=True) for q in range(size))
+
+    if entanglement == 'Diego':
+        for l in range(1, p + 1):
+            if size%2:
+                c.add(gates.CZ(q, q + 1) for q in range(0, size - 2, 2))
+            else:
+                c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
+            c.add(gates.RY(q, theta=0, trainable=True) for q in range(1,size-1))
+            c.add(gates.RX(q, theta=0, trainable=True) for q in range(1, size - 1))
+            if size % 2:
+                c.add(gates.CZ(q, q + 1) for q in range(1, size-1, 2))
+            else:
+                c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
+            c.add(gates.RY(q, theta=0, trainable=True) for q in range(0, size))
+            c.add(gates.RX(q, theta=0, trainable=True) for q in range(0, size))
+
 
     return c
 
