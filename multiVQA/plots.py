@@ -5,53 +5,42 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 from multiVQA.datamanager import read_data
-from matplotlib.pyplot import cm
 import pandas as pd
+from matplotlib.pyplot import cm
 import cmath
-
-def plotter(x, y, flags, fixed,instances=None, save_fig=None, ylim=(0, 1.1)):
-    lines = ['-', '--', '-.', ':']
+def plotter(x, y, instances, trials, flags, fixed, save_fig=None, ylim=(0, 1.1)):
+    lines = ['-', '--', '-.', ':', 'None', 'solid', 'dashed', 'dashdot', 'dotted']
     sns.set(rc={'figure.figsize': (12, 9)})
-    x_array = np.array(x[1])
+    x_array = np.array(x[0])
     line_counter = 0
     for label in flags:
         line_counter += 1
-        color = iter(cm.rainbow(np.linspace(0, 1, len(flags[label]))))
         for flag in flags[label]:
-            print(f'Doing flag {label}:{flag}')
             fixed_labels = fixed
-            fixed_labels[label] = flag
-            average_y = np.empty(len(x[1]))
-            error_y= np.empty(len(x[1]))
-            for i in x[1]:
+            fixed_labels[flags[0]] = flag
+            for i in x[0]:
                 fixed_labels[x[0]] = i
-                total_y = []
-                if instances:
-                    for j in instances:
-                        fixed_labels['instance'] = j
-                        y_instance = read_data('MaxCutDatabase', 'MaxCutDatabase', [y, 'trial'], fixed_labels)
-                        total_y.append(y_instance[0][0])
-                else:
-                    data_y = read_data('MaxCutDatabase', 'MaxCutDatabase', [y, 'trial', 'instance'], fixed_labels)
-                    total_y = [data_y[i][0] for i in range(len(data_y))]
-                average_y[i] = statistics.mean(total_y)
-                error_y[i] = stats.sem(total_y, ddof=0)
-            print('Averages y:',average_y, "Errors y:", error_y)
-            c = next(color)
-            plt.plot(x_array, average_y, label=f'{flag}',  linestyle=lines[line_counter], color=c)
-            plt.fill_between(x_array, average_y - error_y, average_y + error_y, alpha=0.2, color=c)
+                average_y = np.empty(len(x))
+                error_y= np.empty(len(x))
+                for j in instances:
+                    fixed_labels['instances'] = j
+                    y_instance = read_data('MaxCutDatabase', 'MaxCutDatabase', [y], fixed_labels)
+                average_y[i] = statistics.mean(y_instance)
+                error_y[i] = stats.sem(y_instance, ddof=0)
+                plt.plot(x_array, average_y, label=f'{flags[label]}:{flag}',  linestyle=lines[line_counter])
+                plt.fill_between(x_array, average_y - error_y, error_y + error_y, alpha=0.2)
 
 
     # if ansaz:
     #     plt.plot(layers, [ansaz_function(l, nodes[i]) for l in layers], alpha=0.9, linestyle='--',
     #              label=f"Ansaz for nodes n={nodes[i]}")
 
-    plt.legend(title=f'{label}')
+
     plt.xticks(x_array)
     plt.xlim(min(x_array), max(x_array))
     plt.ylim(ylim)
     plt.xlabel(f"{x[0]}", fontsize=18)
-    plt.ylabel(f"Average {y}  over {len(total_y)} graphs", fontsize=18)
+    plt.ylabel(f"Average {y}  over {len(instances)} graphs", fontsize=18)
     if save_fig:
         plt.savefig(f"{save_fig}.svg")
     plt.show()
@@ -63,7 +52,7 @@ def plotter_compare(x, y, flags, fixed, compares, pick_method= 'average', instan
     for flag in flags[1]:
         average_y = np.empty(len(x[1]))
         error_y= np.empty(len(x[1]))
-        for i in x[1]:
+        for i in range(len(x_array)):
             fixed_labels = fixed
             fixed_labels[flags[0]] = flag
             total_y = []
@@ -74,8 +63,8 @@ def plotter_compare(x, y, flags, fixed, compares, pick_method= 'average', instan
                     fixed_labels[flags[0]] = flag
                 else:
                     name_database = 'MaxCutDatabase'
-                    fixed_labels[x[0]] = i
-                    fixed_labels['qubits'] = solve_quadratic(1, 1,-flag*2/3)
+                    fixed_labels[x[0]] = x_array[i]
+                    fixed_labels['qubits'] = solve_quadratic(1, 1, -flag*2/3)
                     #fixed_labels['compression'] = int(1)
                 fixed_labels[compares[0]] = term
                 if instances:
@@ -117,13 +106,108 @@ def plotter_compare(x, y, flags, fixed, compares, pick_method= 'average', instan
         plt.savefig(f"{save_fig}.svg")
     plt.show()
 
+
 def solve_quadratic(a, b, c):
     d = (b ** 2) - (4 * a * c)
 
     # find two solutions
     sol1 = (-b - cmath.sqrt(d)) / (2 * a)
     sol2 = (-b + cmath.sqrt(d)) / (2 * a)
-    return max( sol1.real, sol2.real)
+    return int(max( sol1.real, sol2.real))
+
+
+def plot_histogram(flag, axis, name_database):
+    sns.set(rc={'figure.figsize': (12, 9)})
+    solutions = read_data(name_database, 'MaxCutDatabase', ['unrounded_solution'], flag)
+
+    print(solutions)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def plotter_layer(nodes, layers, starting=0, ending=50, optimization=['COBYLA'],
+                  initial_point='True', random='True', quantity='overlaps', save_fig=None, ylim=(0, 1.1), ansaz=False, entanglement=['linear'] ):
+
+    lines = ['-', '--', '-.', ':', 'None', 'solid', 'dashed', 'dashdot', 'dotted']
+    sns.set(rc={'figure.figsize': (12, 9)})
+    opt_num,entan_num = -1, -1
+    for opt in optimization:
+        opt_num += 1
+        for entan in entanglement:
+            entan_num +=1
+            for i in range(len(nodes)):
+                if quantity == 'energies':
+                    total_energies = np.empty(len(layers))
+                    total_errors_energies = np.empty(len(layers))
+                    for j in range(len(layers)):
+                        with open(
+                                f'cut_average_p_{layers[j]}_n_{nodes[i]}_s_{starting}_e_{ending}_opt_{opt}_init_{initial_point}_random_{random}_entang_{entan}_qb_2_comp_1_pauli_2.npy',
+                                'rb') as f:
+                            overlap = np.load(f)
+                            energies = np.load(f)
+                        total_energies[j] = statistics.mean(energies)
+                        total_errors_energies[j] = stats.sem(energies, ddof=0)
+                    plt.plot(layers, total_energies, label=f'{entan},{opt}:En(n={nodes[i]})',  linestyle=lines[opt_num+entan_num])
+                    plt.fill_between(layers, total_energies - total_errors_energies, total_energies + total_errors_energies,
+                                     alpha=0.2)
+                if quantity == 'time':
+                    total_time = np.empty(len(layers))
+                    for j in range(len(layers)):
+                        with open(
+                                f'overlap_average_p_{layers[j]}_n_{nodes[i]}_s_{starting}_e_{ending}_opt_{opt}_init_{initial_point}_random_{random}_entang_{entan}.npy',
+                                'rb') as f:
+                            overlap = np.load(f)
+                            energies = np.load(f)
+                            time = np.load(f)
+                        total_time[j] = time
+                    plt.plot(layers, total_time, label=f'{entan},{opt}:time (n={nodes[i]})', linestyle=lines[opt_num+entan_num])
+                if quantity == 'overlaps':
+                    total_overlaps = np.empty(len(layers))
+                    total_errors = np.empty(len(layers))
+                    for j in range(len(layers)):
+                        with open(
+                                f'overlap_average_p_{layers[j]}_n_{nodes[i]}_s_{starting}_e_{ending}_opt_{opt}_init_{initial_point}_random_{random}_entang_{entan}.npy',
+                                'rb') as f:
+                            overlaps = np.load(f)
+                        total_overlaps[j] = statistics.mean(overlaps)
+                        total_errors[j] = stats.sem(overlaps, ddof=0)
+                    plt.plot(layers, total_overlaps, label=f'{entan},{opt}:Ov(n={nodes[i]})', linestyle=lines[opt_num+entan_num])
+                    plt.fill_between(layers, total_overlaps - total_errors, total_overlaps + total_errors, alpha=0.2)
+                    if ansaz:
+                        plt.plot(layers, [ansaz_function(l, nodes[i]) for l in layers], alpha=0.9, linestyle='--',
+                                 label=f"Ansaz for nodes n={nodes[i]}")
+
+    plt.legend(title='Number of qubits')
+    plt.xticks(layers)
+    plt.xlim(min(layers), max(layers))
+    plt.ylim(ylim)
+    plt.xlabel("Number of layers", fontsize=18)
+    if quantity == 'energies':
+        plt.ylabel(f"Average energy ratio over {ending -starting} graphs", fontsize=18)
+    if quantity == 'time':
+        plt.ylabel(f"Average time over {ending -starting} graphs", fontsize=18)
+    else:
+        plt.ylabel(f"Average overlap over {ending -starting} graphs", fontsize=18)
+    if save_fig:
+        plt.savefig(f"{save_fig}.svg")
+    plt.show()
+
+
 
 def ansaz_function(p, n):
     return 2 ** (-(0.18 / (p) + 0.52) * (n / np.log(2)) +1.24)
