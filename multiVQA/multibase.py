@@ -1,11 +1,11 @@
 from numpy.random import uniform, randint
-from numpy import ceil, floor, ndindex
+from numpy import ceil, floor, ndindex, tanh
 from qibo.symbols import I, X, Y, Z
 from qibo.config import raise_error
 from qibo import K
 from itertools import combinations
 import tensorflow as tf
-
+import numpy as np
 
 class MultibaseVQA(object):
     from qibo import optimizers
@@ -24,7 +24,14 @@ class MultibaseVQA(object):
     def linear_activation(x):
         return x
 
-    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words, compression=None):
+    @staticmethod
+    def my_activation(x):
+        if x > 0:
+            return (tanh((x-(1/np.sqrt(45)))*45)+1)/2
+        else:
+            return -(tanh(-(x+(1/np.sqrt(45)))*45)+1)/2
+
+    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words, compression=None, lower_order_terms=None):
 
         def get_pauli_word(indices, k):
             # Generate pauli string corresponding to indices
@@ -52,9 +59,14 @@ class MultibaseVQA(object):
             pauli_strings = self._pauli_string(pauli_string_length, compression)
             num_strings = len(pauli_strings)
             # position i stores string corresponding to the i-th node.
-            self.node_mapping = [
-                get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
-                in range(num_nodes)]
+            if lower_order_terms is None:
+                self.node_mapping = [
+                    get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
+                    in range(pauli_string_length*3, num_nodes + pauli_string_length*3)]
+            else:
+                self.node_mapping = [
+                    get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
+                    in range(num_nodes)]
         return ceil(num_nodes / num_strings)
 
     def set_activation(self, function):
@@ -74,7 +86,7 @@ class MultibaseVQA(object):
                         instance[index] = i
                     pauli_string.append(tuple(instance))
 
-        return pauli_string
+        return sorted(pauli_string, key=lambda tup: tup.count(0), reverse=True)
 
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,

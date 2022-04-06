@@ -13,7 +13,8 @@ from multiVQA.datamanager import insert_value_table, connect_database, create_ta
 class Benchmarker(object):
 
     def __init__(self, kind, nodes_number, starting, ending, trials=1, layer_number='None', optimization='None',
-                 initial_parameters='None', ratio_total_words='None', pauli_string_length='None',
+                 initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
+                 lower_order_terms=None,
                  entanglement='None',
                  graph_dict=None, graph_kind='indexed', activation_function='None'):
 
@@ -31,6 +32,8 @@ class Benchmarker(object):
         self.graph_dict = graph_dict
         self.graph_kind = graph_kind
         self.activation_function = activation_function
+        self.compression = compression
+        self.lower_order_terms = lower_order_terms
         if pauli_string_length != None:
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
@@ -46,8 +49,16 @@ class Benchmarker(object):
             self._eigensolver_evaluater_serial()
             print("Total time:", time() - my_time)
 
+    @staticmethod
+    def nodes_compressed(quibits):
+        return int((3 * (quibits ** 2 + quibits) / 2))
+
+    @staticmethod
+    def max_compression(quibits):
+        return 4 ** quibits - 1
+
     def _eigensolver_evaluater_parallel(self):
-        process_number = 1
+        process_number = 35
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             self.kind = 'bruteforce'
@@ -126,11 +137,14 @@ class Benchmarker(object):
                     initial_parameters = self.initial_parameters
 
                 solver = MultibaseVQA(circuit, adjacency_matrix)
-                if self.ratio_total_words == 1:
-                    solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
-                else:
+
+                if self.compression is not None:
+                    self.ratio_total_words = self.nodes_compressed(self.qubits) / self.max_compression(self.qubits)
+                    self.pauli_string_length = self.qubits
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words,
-                                        compression=2)
+                                        compression=self.compression, lower_order_terms=self.lower_order_terms)
+                else:
+                    solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
 
                 solver.set_activation(self.activation_function)
 
