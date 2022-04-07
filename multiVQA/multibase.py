@@ -31,7 +31,7 @@ class MultibaseVQA(object):
         else:
             return -(tanh(-(x+(1/np.sqrt(45)))*45)+1)/2
 
-    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words, compression=None, lower_order_terms=None):
+    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words=None, compression=None, lower_order_terms=None):
 
         def get_pauli_word(indices, k):
             # Generate pauli string corresponding to indices

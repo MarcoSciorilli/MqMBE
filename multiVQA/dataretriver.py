@@ -8,6 +8,7 @@ from multiVQA.multibase import MultibaseVQA
 import qibo
 import networkx as nx
 from multiVQA.datamanager import insert_value_table, connect_database, create_table, read_data
+import math
 
 
 class Benchmarker(object):
@@ -34,7 +35,11 @@ class Benchmarker(object):
         self.activation_function = activation_function
         self.compression = compression
         self.lower_order_terms = lower_order_terms
-        if pauli_string_length != None:
+
+        if self.compression is not None:
+            self.qubits = math.ceil(max(solve_quadratic(1, -1, -2/3*self.nodes_number)))
+            self.pauli_string_length = self.qubits
+        if pauli_string_length != 'None':
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
@@ -139,9 +144,7 @@ class Benchmarker(object):
                 solver = MultibaseVQA(circuit, adjacency_matrix)
 
                 if self.compression is not None:
-                    self.ratio_total_words = self.nodes_compressed(self.qubits) / self.max_compression(self.qubits)
-                    self.pauli_string_length = self.qubits
-                    solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words,
+                    solver.encode_nodes(self.nodes_number, self.pauli_string_length,
                                         compression=self.compression, lower_order_terms=self.lower_order_terms)
                 else:
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
@@ -205,3 +208,14 @@ class Benchmarker(object):
                     continue
                 edges[(i, j)] = adjacency_matrix[i][j]
         return edges
+
+
+def solve_quadratic(a,b,c):
+    discriminant = b**2 - 4 * a * c
+    if discriminant >= 0:
+        x_1 = (-b+math.sqrt(discriminant))/2*a
+        x_2 = (-b-math.sqrt(discriminant))/2*a
+    else:
+        x_1 = complex((-b/(2*a)), math.sqrt(-discriminant)/(2*a))
+        x_2 = complex((-b/(2*a)), -math.sqrt(-discriminant)/(2*a))
+    return x_1, x_2
