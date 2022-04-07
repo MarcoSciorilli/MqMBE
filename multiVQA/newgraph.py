@@ -50,7 +50,7 @@ class RandomGraphs(object):
         for i in range(size):
             for j in range(size):
                 qubo_vector[i] += weight_matrix[i, j]
-        my_quadratic_program = QuadraticProgram('my_problem')
+        y_quadratic_program = QuadraticProgram('my_problem')
         for k in range(size):
             my_quadratic_program.binary_var(name=f'x_{k}')
 

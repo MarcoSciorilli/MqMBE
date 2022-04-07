@@ -75,7 +75,8 @@ class MultibaseVQA(object):
     def set_circuit(self, circuit):
         self.circuit = circuit
 
-    def _pauli_string(self, pauli_string_length, compression):
+    @staticmethod
+    def _pauli_string(pauli_string_length, compression):
         pauli_string = []
         for i in range(1, 4):
             for k in range(1, compression + 1):
@@ -98,8 +99,8 @@ class MultibaseVQA(object):
             final_state = circuit()
             loss = 0
             for i in adjacency_matrix:
-                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) \
-                        * activation_function(node_mapping[i[1]].expectation(final_state))
+                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state, normalize=True)) \
+                        * activation_function(node_mapping[i[1]].expectation(final_state, normalize=True))
             return loss
 
 
@@ -127,14 +128,14 @@ class MultibaseVQA(object):
             cut_value = 0
             for i in self.adjacency_matrix:
                 cut_value += self.adjacency_matrix[i] * (1 \
-                                                         - _round(self.node_mapping[i[0]].expectation(final_state)) \
-                                                         * _round(self.node_mapping[i[1]].expectation(final_state))) / 2
+                                                         - _round(self.node_mapping[i[0]].expectation(final_state, normalize=True)) \
+                                                         * _round(self.node_mapping[i[1]].expectation(final_state, normalize=True))) / 2
             return cut_value
 
         def _retrive_solution(params, circuit):
             circuit.set_parameters(params)
             final_state = circuit()
-            first_part = [node.expectation(final_state) for node in self.node_mapping]
+            first_part = [node.expectation(final_state, normalize=True) for node in self.node_mapping]
             return first_part
 
         def _round(num):
