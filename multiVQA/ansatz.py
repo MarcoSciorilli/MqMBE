@@ -86,10 +86,10 @@ def var_form(size=6, p: int = 0, entanglement='basic'):
                 c.add(gates.CZ(q, q + 1) for q in range(0, size - 2, 2))
             else:
                 c.add(gates.CZ(q, q + 1) for q in range(0, size - 1, 2))
-            c.add(gates.RY(q, theta=0, trainable=True) for q in range(1,size-1))
+            c.add(gates.RY(q, theta=0, trainable=True) for q in range(1, size - 1))
             c.add(gates.RX(q, theta=0, trainable=True) for q in range(1, size - 1))
             if size % 2:
-                c.add(gates.CZ(q, q + 1) for q in range(1, size-1, 2))
+                c.add(gates.CZ(q, q + 1) for q in range(1, size - 1, 2))
             else:
                 c.add(gates.CZ(q, q + 1) for q in range(1, size - 2, 2))
             c.add(gates.RY(q, theta=0, trainable=True) for q in range(0, size))

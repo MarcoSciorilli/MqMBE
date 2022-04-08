@@ -38,14 +38,13 @@ class Benchmarker(object):
         self.lower_order_terms = lower_order_terms
 
         if self.compression is not None:
-            print('Arrivo qui')
             self.qubits = math.ceil(max(self.solve_quadratic(1, -1, -2/3*self.nodes_number)))
             self.pauli_string_length = self.qubits
         if pauli_string_length != 'None':
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits < 1:
+        if self.qubits < 10:
             qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
@@ -59,7 +58,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 35
+        process_number = 64
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             self.kind = 'bruteforce'
@@ -115,7 +114,7 @@ class Benchmarker(object):
                 qubits = self.qubits
                 circuit = var_form(qubits, self.layer_number, self.entanglement)
                 if self.initial_parameters == 'None':
-                    initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
+                    initial_parameters = np.random.normal(0.5, 0.1, len(circuit.get_parameters(format='flatlist')))
                 else:
                     initial_parameters = self._smart_initialization(instance, trial, circuit)
 
@@ -194,12 +193,13 @@ class Benchmarker(object):
 
     def _smart_initialization(self, instance, trial, circuit):
         if self.layer_number == 0:
-            return np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
+            return np.random.normal(0, 0.1, len(circuit.get_parameters(format='flatlist')))
         else:
             previous_parameters = read_data('MaxCutDatabase', 'MaxCutDatabase', ['parameters'],
                                                 { 'instance': instance, 'trial':trial, 'layer_number': f'{int(self.layer_number)-1}'})
+            np.random.seed(self.layer_number*instance*trial)
             previous_parameters = np.array([json.loads(previous_parameters[j][0]) for j in range(len(previous_parameters))])
-            added_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist'))- len(previous_parameters[0]))
+            added_parameters = np.random.normal(0, 0.1, len(circuit.get_parameters(format='flatlist'))- len(previous_parameters[0]))
         return np.append(previous_parameters, added_parameters)
 
     @staticmethod

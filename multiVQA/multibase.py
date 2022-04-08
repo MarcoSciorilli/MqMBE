@@ -101,7 +101,10 @@ class MultibaseVQA(object):
             for i in adjacency_matrix:
                 loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) \
                         * activation_function(node_mapping[i[1]].expectation(final_state))
-            return loss
+            penalization = 0
+            for i in range(len(node_mapping)):
+                penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
+            return loss + penalization
 
 
 
