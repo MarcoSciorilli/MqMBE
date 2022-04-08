@@ -12,7 +12,7 @@ if __name__ == '__main__':
         return 4 ** quibits - 1
 
 
-    #vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
+    # vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
 
@@ -22,10 +22,10 @@ if __name__ == '__main__':
 
     for i in [9, 18, 30, 45]:
         print(f'Nodes number:{i}')
-        for j in range(0, 6):
+        for j in range(1, 7):
             print(f'Layer number:{j}')
             vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='multibaseVQA',
-                                        layer_number=j, optimization='SLSQP',compression=2,
+                                        layer_number=j, optimization='SLSQP',compression=2,initial_parameters=True,
                                         entanglement='article',
                                         activation_function=np.tanh)
 

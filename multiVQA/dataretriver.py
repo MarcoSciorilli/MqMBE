@@ -9,6 +9,7 @@ import qibo
 import networkx as nx
 from multiVQA.datamanager import insert_value_table, connect_database, create_table, read_data
 import math
+import json
 
 
 class Benchmarker(object):
@@ -37,13 +38,14 @@ class Benchmarker(object):
         self.lower_order_terms = lower_order_terms
 
         if self.compression is not None:
-            self.qubits = math.ceil(max(solve_quadratic(1, -1, -2/3*self.nodes_number)))
+            print('Arrivo qui')
+            self.qubits = math.ceil(max(self.solve_quadratic(1, -1, -2/3*self.nodes_number)))
             self.pauli_string_length = self.qubits
         if pauli_string_length != 'None':
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits < 10:
+        if self.qubits < 1:
             qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
@@ -54,13 +56,7 @@ class Benchmarker(object):
             self._eigensolver_evaluater_serial()
             print("Total time:", time() - my_time)
 
-    @staticmethod
-    def nodes_compressed(quibits):
-        return int((3 * (quibits ** 2 + quibits) / 2))
 
-    @staticmethod
-    def max_compression(quibits):
-        return 4 ** quibits - 1
 
     def _eigensolver_evaluater_parallel(self):
         process_number = 35
@@ -88,24 +84,6 @@ class Benchmarker(object):
             for instance in range(self.starting, self.ending):
                 self._single_graph_evaluation(instance, trial, self.graph_dict)
 
-    def _do_graph(self, instance):
-        true_random_graphs = False
-
-        if self.graph_kind == 'random':
-            true_random_graphs = True
-        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs).graph
-        if true_random_graphs:
-            instance = graph.return_index()
-        return graph, instance
-
-    def _get_exact_solution(self,instance):
-        result_exact = read_data('MaxCutDatabase', 'MaxCutDatabase', ['max_energy', 'min_energy'],
-                                                {'kind': 'bruteforce', 'instance': instance,
-                                                 'nodes_number': self.nodes_number,
-                                                 'graph_kind': self.graph_kind})
-        if len(result_exact) == 0:
-            result_exact = [(1, 0)]
-        return result_exact
 
     def _single_graph_evaluation(self, instance, trial, graph):
         if graph is None:
@@ -139,7 +117,7 @@ class Benchmarker(object):
                 if self.initial_parameters == 'None':
                     initial_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
                 else:
-                    initial_parameters = self.initial_parameters
+                    initial_parameters = self._smart_initialization(instance, trial, circuit)
 
                 solver = MultibaseVQA(circuit, adjacency_matrix)
 
@@ -184,6 +162,46 @@ class Benchmarker(object):
                'epochs': epochs, 'time': timing}
         insert_value_table('MaxCutDatabase', 'MaxCutDatabase', row)
 
+
+    def _graph_to_dict(self, graph):
+        adjacency_matrix = nx.to_numpy_array(graph)
+        edges = {}
+        for i in range(adjacency_matrix.shape[0]):
+            for j in range(i):
+                if adjacency_matrix[i][j] == 0:
+                    continue
+                edges[(i, j)] = adjacency_matrix[i][j]
+        return edges
+
+    def _do_graph(self, instance):
+        true_random_graphs = False
+
+        if self.graph_kind == 'random':
+            true_random_graphs = True
+        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs).graph
+        if true_random_graphs:
+            instance = graph.return_index()
+        return graph, instance
+
+    def _get_exact_solution(self,instance):
+        result_exact = read_data('MaxCutDatabase', 'MaxCutDatabase', ['max_energy', 'min_energy'],
+                                                {'kind': 'bruteforce', 'instance': instance,
+                                                 'nodes_number': self.nodes_number,
+                                                 'graph_kind': self.graph_kind})
+        if len(result_exact) == 0:
+            result_exact = [(1, 0)]
+        return result_exact
+
+    def _smart_initialization(self, instance, trial, circuit):
+        if self.layer_number == 0:
+            return np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist')))
+        else:
+            previous_parameters = read_data('MaxCutDatabase', 'MaxCutDatabase', ['parameters'],
+                                                { 'instance': instance, 'trial':trial, 'layer_number': f'{int(self.layer_number)-1}'})
+            previous_parameters = np.array([json.loads(previous_parameters[j][0]) for j in range(len(previous_parameters))])
+            added_parameters = np.random.normal(0, 1, len(circuit.get_parameters(format='flatlist'))- len(previous_parameters[0]))
+        return np.append(previous_parameters, added_parameters)
+
     @staticmethod
     def initialize_database(name_database):
         rows = {'kind': 'TEXT', 'instance': 'TEXT', 'trial': 'INT', 'layer_number': 'INT', 'nodes_number': 'INT',
@@ -198,24 +216,22 @@ class Benchmarker(object):
         connect_database(name_database)
         create_table(name_database, name_database, rows, unique)
 
+    @staticmethod
+    def nodes_compressed(quibits):
+        return int((3 * (quibits ** 2 + quibits) / 2))
 
-    def _graph_to_dict(self, graph):
-        adjacency_matrix = nx.to_numpy_array(graph)
-        edges = {}
-        for i in range(adjacency_matrix.shape[0]):
-            for j in range(i):
-                if adjacency_matrix[i][j] == 0:
-                    continue
-                edges[(i, j)] = adjacency_matrix[i][j]
-        return edges
+    @staticmethod
+    def max_compression(quibits):
+        return 4 ** quibits - 1
 
+    @staticmethod
+    def solve_quadratic(a, b, c):
+        discriminant = b**2 - 4 * a * c
+        if discriminant >= 0:
+            x_1 = (-b+math.sqrt(discriminant))/2*a
+            x_2 = (-b-math.sqrt(discriminant))/2*a
+        else:
+            x_1 = complex((-b/(2*a)), math.sqrt(-discriminant)/(2*a))
+            x_2 = complex((-b/(2*a)), -math.sqrt(-discriminant)/(2*a))
+        return x_1, x_2
 
-def solve_quadratic(a,b,c):
-    discriminant = b**2 - 4 * a * c
-    if discriminant >= 0:
-        x_1 = (-b+math.sqrt(discriminant))/2*a
-        x_2 = (-b-math.sqrt(discriminant))/2*a
-    else:
-        x_1 = complex((-b/(2*a)), math.sqrt(-discriminant)/(2*a))
-        x_2 = complex((-b/(2*a)), -math.sqrt(-discriminant)/(2*a))
-    return x_1, x_2
