@@ -44,7 +44,7 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits < 10:
+        if self.qubits < 1:
             qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
