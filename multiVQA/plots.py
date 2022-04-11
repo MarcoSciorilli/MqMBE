@@ -68,7 +68,6 @@ def plotter_compare(x, y, flags, fixed, compares, pick_method='average', instanc
                 else:
                     name_database = 'MaxCutDatabase'
                     fixed_labels[x[0]] = x_array[i]
-                    fixed_labels['qubits'] = solve_quadratic(1, 1, -flag * 2 / 3)
                     # fixed_labels['compression'] = int(1)
                 fixed_labels[compares[0]] = term
                 if instances:
@@ -156,7 +155,7 @@ def plot_histogram(flag, name_database, bins, quibits, save_fig=None):
     # print(statistics.mean(list(map(abs, my_values_single))),statistics.mean(list(map(abs, my_values_two))))
 
 
-def animated_histograms(range_layer, flag, name_database, bins, ylimit, namefile):
+def animated_histograms(range_layer, flag, name_database, bins, ylimit, namefile=None):
     fig = plt.figure()
     sns.set(rc={'figure.figsize': (12, 9)})
     def plot_histogram_frame(i, range_layer,flag, name_database, bins):
@@ -170,12 +169,18 @@ def animated_histograms(range_layer, flag, name_database, bins, ylimit, namefile
                 my_values_two.append(i)
         plt.cla()
         plt.ylim(ylimit)
-        plt.hist(x=my_values_two, bins=bins, range=(-1, 1))
+        results = plt.hist(x=my_values_two, bins=bins, range=(-1, 1))
+        modes_index = np.argpartition(results[0], -2)[-2:]
+        mode = (abs(results[1][modes_index[0]])+abs(results[1][modes_index[1]]))/2
+        print(mode)
 
 
     ani = FuncAnimation(fig, plot_histogram_frame, frames=len(range_layer), interval=500,
                         fargs=(range_layer,flag, name_database, bins))
-    ani.save(f'{namefile}.gif')
+    if namefile is None:
+        ani.save(f'Dummy.gif')
+    else:
+        ani.save(f'{namefile}.gif')
     plt.show()
 
 

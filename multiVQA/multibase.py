@@ -14,6 +14,7 @@ class MultibaseVQA(object):
         self.activation_function = self.linear_activation
         self.circuit = circuit
         self.adjacency_matrix = adjacency_matrix
+        self.parameter_iteration = []
 
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
@@ -30,6 +31,9 @@ class MultibaseVQA(object):
             return (tanh((x-(1/np.sqrt(45)))*45)+1)/2
         else:
             return -(tanh(-(x+(1/np.sqrt(45)))*45)+1)/2
+
+    def _callback(self, x):
+        self.parameter_iteration.append(x)
 
     def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words=None, compression=None, lower_order_terms=None):
 
@@ -94,17 +98,32 @@ class MultibaseVQA(object):
                  options=None, processes=None, compile=False):
 
         def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
-            # defines loss function with given activation function
-            circuit.set_parameters(params)
-            final_state = circuit()
-            loss = 0
-            for i in adjacency_matrix:
-                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) \
-                        * activation_function(node_mapping[i[1]].expectation(final_state))
-            penalization = 0
-            for i in range(len(node_mapping)):
-                penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
-            return loss + penalization
+            if len(self.parameter_iteration) > 0:
+                previous_params = self.parameter_iteration[-1]
+                circuit.set_parameters(previous_params)
+                previous_final_state = circuit()
+                # defines loss function with given activation function
+                circuit.set_parameters(params)
+                final_state = circuit()
+                loss = 0
+                for i in adjacency_matrix:
+                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)+node_mapping[i[0]].expectation(previous_final_state)*node_mapping[i[0]].expectation(previous_final_state)) \
+                            * activation_function(node_mapping[i[1]].expectation(final_state)+node_mapping[i[1]].expectation(previous_final_state)*node_mapping[i[1]].expectation(previous_final_state))
+                penalization = 0
+                for i in range(len(node_mapping)):
+                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
+                return loss + penalization
+            else:
+                circuit.set_parameters(params)
+                final_state = circuit()
+                loss = 0
+                for i in adjacency_matrix:
+                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) \
+                            * activation_function(node_mapping[i[1]].expectation(final_state))
+                penalization = 0
+                for i in range(len(node_mapping)):
+                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
+                return loss + penalization
 
 
 
@@ -186,7 +205,7 @@ class MultibaseVQA(object):
                                                              args=args,
                                                              method=method, jac=jac, hess=hess, hessp=hessp,
                                                              bounds=bounds, constraints=constraints,
-                                                             tol=tol, callback=callback, options=options,
+                                                             tol=tol, callback=self._callback, options=options,
                                                              compile=compile,
                                                              processes=processes)
         solution = _retrive_solution(parameters, self.circuit)
