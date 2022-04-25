@@ -10,11 +10,13 @@ import numpy as np
 class MultibaseVQA(object):
     from qibo import optimizers
     from qibo import K
-    def __init__(self, circuit, adjacency_matrix):
+    def __init__(self, circuit, adjacency_matrix, max_eigenvalue, hyperparameters):
         self.activation_function = self.linear_activation
         self.circuit = circuit
         self.adjacency_matrix = adjacency_matrix
         self.parameter_iteration = []
+        self.max_eigenvalue = max_eigenvalue
+        self.hyperparameters = hyperparameters
 
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
@@ -28,9 +30,9 @@ class MultibaseVQA(object):
     @staticmethod
     def my_activation(x):
         if x > 0:
-            return (tanh((x-(1/np.sqrt(45)))*45)+1)/2
+            return (tanh((x-(0.5))*(10))+1)/2
         else:
-            return -(tanh(-(x+(1/np.sqrt(45)))*45)+1)/2
+            return -(tanh(-(x+(0.5))*(10))+1)/2
 
     def _callback(self, x):
         self.parameter_iteration.append(x)
@@ -96,10 +98,10 @@ class MultibaseVQA(object):
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
                  options=None, processes=None, compile=False):
-
+        '''
         def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
-            if len(self.parameter_iteration) > 0:
-                previous_params = self.parameter_iteration[-1]
+            if len(self.parameter_iteration) > 1:
+                previous_params = self.parameter_iteration[-2]
                 circuit.set_parameters(previous_params)
                 previous_final_state = circuit()
                 # defines loss function with given activation function
@@ -107,11 +109,11 @@ class MultibaseVQA(object):
                 final_state = circuit()
                 loss = 0
                 for i in adjacency_matrix:
-                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)+node_mapping[i[0]].expectation(previous_final_state)*node_mapping[i[0]].expectation(previous_final_state)) \
-                            * activation_function(node_mapping[i[1]].expectation(final_state)+node_mapping[i[1]].expectation(previous_final_state)*node_mapping[i[1]].expectation(previous_final_state))
+                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) * activation_function(node_mapping[i[1]].expectation(final_state))
+
                 penalization = 0
                 for i in range(len(node_mapping)):
-                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
+                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2 + activation_function(node_mapping[i].expectation(final_state)*node_mapping[i].expectation(previous_final_state)))
                 return loss + penalization
             else:
                 circuit.set_parameters(params)
@@ -124,8 +126,21 @@ class MultibaseVQA(object):
                 for i in range(len(node_mapping)):
                     penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
                 return loss + penalization
+        '''
 
+        def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
+            # defines loss function with given activation function
+            circuit.set_parameters(params)
+            final_state = circuit()
+            loss = 0
 
+            for i in adjacency_matrix:
+                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)*self.hyperparameters[0]*circuit.nqubits) \
+                        * activation_function(node_mapping[i[1]].expectation(final_state)*self.hyperparameters[0]*circuit.nqubits)
+            penalization = 0
+            for i in range(len(node_mapping)):
+                penalization += ((node_mapping[i].expectation(final_state))**2)#- (self.hyperparameters[1]/(len(node_mapping)))) ** 2
+            return loss + 2*self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
 
         def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping):
             # defines loss function with given activation function
