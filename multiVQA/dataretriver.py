@@ -18,7 +18,7 @@ class Benchmarker(object):
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
-                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None'):
+                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True):
 
         self.kind = kind
         self.nodes_number = nodes_number
@@ -37,12 +37,17 @@ class Benchmarker(object):
         self.compression = compression
         self.lower_order_terms = lower_order_terms
         self.hyperparameters = hyperparameters
+        self.shuffle = shuffle
+        self.same_letter = same_letter
 
         if self.compression is not None:
-            if self.lower_order_terms is None:
-                self.qubits = math.ceil(max(self.solve_quadratic(1, -1, -2 / 3 * self.nodes_number)))
+            if qubits is None:
+                if self.lower_order_terms:
+                    self.qubits = math.ceil(max(self.solve_quadratic(1, 1, -2 / 3 * self.nodes_number)))
+                else:
+                    self.qubits = math.ceil(max(self.solve_quadratic(1, -1, -2 / 3 * self.nodes_number)))
             else:
-                self.qubits = math.ceil(max(self.solve_quadratic(1, 1, -2 / 3 * self.nodes_number)))
+                self.qubits = qubits
             self.pauli_string_length = self.qubits
         if pauli_string_length != 'None':
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
@@ -62,7 +67,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 35
+        process_number = 20
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             self.kind = 'bruteforce'
@@ -123,10 +128,9 @@ class Benchmarker(object):
                     initial_parameters = self._smart_initialization(instance, trial, circuit)
 
                 solver = MultibaseVQA(circuit, adjacency_matrix, max_eigenvalue, hyperparameters=self.hyperparameters)
-
                 if self.compression is not None:
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length,
-                                        compression=self.compression, lower_order_terms=self.lower_order_terms)
+                                        compression=self.compression, lower_order_terms=self.lower_order_terms, shuffle=self.shuffle, seed=(trial+instance), same_letter=self.same_letter)
                 else:
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
 

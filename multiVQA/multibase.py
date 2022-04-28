@@ -6,6 +6,8 @@ from qibo import K
 from itertools import combinations
 import tensorflow as tf
 import numpy as np
+import random
+from itertools import combinations
 
 class MultibaseVQA(object):
     from qibo import optimizers
@@ -28,6 +30,16 @@ class MultibaseVQA(object):
         return x
 
     @staticmethod
+    def picewise_sin(x):
+        if np.pi*x/2 > 1:
+            return 1
+        if np.pi*x/2 < -1:
+            return -1
+        else:
+            return np.sin(np.pi*x/2)
+
+
+    @staticmethod
     def my_activation(x):
         if x > 0:
             return (tanh((x-(0.5))*(10))+1)/2
@@ -37,7 +49,7 @@ class MultibaseVQA(object):
     def _callback(self, x):
         self.parameter_iteration.append(x)
 
-    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words=None, compression=None, lower_order_terms=None):
+    def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words=None, compression=None, lower_order_terms=False, shuffle=True, seed=0, same_letter=True):
 
         def get_pauli_word(indices, k):
             # Generate pauli string corresponding to indices
@@ -62,17 +74,18 @@ class MultibaseVQA(object):
                 for i
                 in range(num_nodes)]
         else:
-            pauli_strings = self._pauli_string(pauli_string_length, compression)
+            if same_letter:
+                pauli_strings = self._pauli_string_same_letter(pauli_string_length, compression,lower_order_terms, shuffle, seed)
+            else:
+                pauli_strings = self._random_pauli_string(pauli_string_length, compression, lower_order_terms,
+                                                               shuffle, seed)
+
             num_strings = len(pauli_strings)
             # position i stores string corresponding to the i-th node.
-            if lower_order_terms is None:
-                self.node_mapping = [
-                    get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
-                    in range(pauli_string_length*3, num_nodes + pauli_string_length*3)]
-            else:
-                self.node_mapping = [
-                    get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
-                    in range(num_nodes)]
+            self.node_mapping = [
+                get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
+                in range(num_nodes)]
+
         return ceil(num_nodes / num_strings)
 
     def set_activation(self, function):
@@ -82,19 +95,46 @@ class MultibaseVQA(object):
         self.circuit = circuit
 
     @staticmethod
-    def _pauli_string(pauli_string_length, compression):
+    def _pauli_string_same_letter(pauli_string_length, order, lower_order_terms, shuffle, seed):
         pauli_string = []
+        if lower_order_terms:
+            smallest_lenght = 1
+        else:
+            smallest_lenght = order
         for i in range(1, 4):
-            for k in range(1, compression + 1):
+            for k in range(smallest_lenght, order + 1):
                 comb = combinations(list(range(pauli_string_length)), k)
                 for positions in comb:
                     instance = [0] * pauli_string_length
                     for index in positions:
                         instance[index] = i
                     pauli_string.append(tuple(instance))
+        if shuffle:
+            random.seed(seed)
+            random.shuffle(pauli_string)
+        #return sorted(pauli_string, key=lambda tup: tup.count(0), reverse=True)
+        return pauli_string
 
-        return sorted(pauli_string, key=lambda tup: tup.count(0), reverse=True)
-
+    @staticmethod
+    def _random_pauli_string(pauli_string_length, order, lower_order_terms, shuffle, seed):
+        pauli_tuples = [(i,j) for i in range(1,4) for j in range(pauli_string_length)]
+        if lower_order_terms:
+            smallest_lenght = 1
+        else:
+            smallest_lenght = order
+        total_combinations = []
+        for i in range(smallest_lenght, order + 1):
+            total_combinations = total_combinations +(list(combinations(pauli_tuples, i)))
+        pauli_string = []
+        for comb in total_combinations:
+            instance = [0] * pauli_string_length
+            for j in comb:
+                instance[j[1]] = j[0]
+                pauli_string.append(instance)
+        if shuffle:
+            random.seed(seed)
+            random.shuffle(pauli_string)
+        return pauli_string
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
                  options=None, processes=None, compile=False):
@@ -140,7 +180,7 @@ class MultibaseVQA(object):
             penalization = 0
             for i in range(len(node_mapping)):
                 penalization += ((node_mapping[i].expectation(final_state))**2)#- (self.hyperparameters[1]/(len(node_mapping)))) ** 2
-            return loss + 2*self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
+            return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
 
         def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping):
             # defines loss function with given activation function
