@@ -14,12 +14,14 @@ import json
 
 class Benchmarker(object):
 
-    def __init__(self, kind, nodes_number, starting, ending, trials=1, layer_number='None', optimization='None',
+    def __init__(self, kind, nodes_number, starting, ending, trials=1, layer_number=None, optimization='None',
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
                  graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True):
 
+        if layer_number is None:
+            layer_number = ['None']
         self.kind = kind
         self.nodes_number = nodes_number
         self.starting = starting
@@ -53,7 +55,7 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits < 10:
+        if self.qubits < 15:
             qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
@@ -67,15 +69,18 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 20
+        process_number = 96
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
-            self.kind = 'bruteforce'
-            [pool.apply_async(self._single_graph_evaluation, (instance, self.trials,
-                                                              self.graph_dict[instance])) for instance in
-             self.graph_dict if self.graph_dict[instance].number_of_nodes() < 20]
+            [pool.apply_async(self._single_graph_evaluation, (instance, trial, (graph, self.graph_dict[graph]), layer)) for layer in
+             self.layer_number for instance in
+             range(self.starting, self.ending) for graph in self.graph_dict for trial in range(self.trials)]
+        #     self.kind = 'bruteforce'
+        #     [pool.apply_async(self._single_graph_evaluation, (instance, self.trials,
+        #                                                       self.graph_dict[instance])) for instance in
+        #      self.graph_dict if self.graph_dict[instance].number_of_nodes() < 20]
             # add the non-brute force
-        [pool.apply_async(self._single_graph_evaluation, (instance, trial, self.graph_dict)) for instance in
+        [pool.apply_async(self._single_graph_evaluation, (instance, trial, self.graph_dict, layer)) for layer in self.layer_number for instance in
              range(self.starting, self.ending) for trial in range(self.trials)]
         pool.close()
         pool.join()
@@ -86,16 +91,21 @@ class Benchmarker(object):
                 if self.graph_dict[instance].number_of_nodes() < 20:
                     self.kind = 'bruteforce'
                     # fix name of graph and add non bruteforce
-                    self._single_graph_evaluation(instance, self.trials, instance)
+                    self._single_graph_evaluation(instance, self.trials, instance, self.layer_number[0])
+        for layer in self.layer_number:
+            print(f'Layer number:{layer}')
+            for trial in range(self.trials):
+                for instance in range(self.starting, self.ending):
+                    self._single_graph_evaluation(instance, trial, self.graph_dict, layer)
 
-        for trial in range(self.trials):
-            for instance in range(self.starting, self.ending):
-                self._single_graph_evaluation(instance, trial, self.graph_dict)
 
-
-    def _single_graph_evaluation(self, instance, trial, graph):
+    def _single_graph_evaluation(self, instance, trial, graph, layer):
         if graph is None:
             graph, instance = self._do_graph(instance)
+        else:
+            instance_name = graph[0]
+            graph = graph[1]
+
 
         if self.kind == 'bruteforce':
             my_time = time()
@@ -121,7 +131,7 @@ class Benchmarker(object):
                     self.activation_function = MultibaseVQA.linear_activation()
 
                 qubits = self.qubits
-                circuit = var_form(qubits, self.layer_number, self.entanglement)
+                circuit = var_form(qubits, layer, self.entanglement)
                 if self.initial_parameters == 'None':
                     initial_parameters = np.pi * np.random.uniform(0, 2, len(circuit.get_parameters(format='flatlist')))
                 else:
@@ -142,7 +152,8 @@ class Benchmarker(object):
                                                                                                options={
                                                                                                    'maxiter': 1000000000})
                 timing = time() - my_time
-                #print(timing)
+
+                print(timing)
                 if self.optimization == 'cma':
                     epochs = extra[1].result[3]
                 elif self.optimization != 'sgd':
@@ -157,7 +168,9 @@ class Benchmarker(object):
             if max_energy == energy_ratio:
                 energy_ratio = 'None'
 
-        row = {'kind': self.kind, 'instance': instance, 'trial': trial, 'layer_number': self.layer_number,
+        if graph is not None:
+            instance = instance_name
+        row = {'kind': self.kind, 'instance': str(instance), 'trial': trial, 'layer_number': layer,
                'nodes_number': self.nodes_number, 'optimization': self.optimization,
                'activation_function': str(activation_function_name),
                'compression': self.ratio_total_words, 'pauli_string_length': self.pauli_string_length,
@@ -203,13 +216,13 @@ class Benchmarker(object):
             result_exact = [(1, 0)]
         return result_exact
 
-    def _smart_initialization(self, instance, trial, circuit):
-        if self.layer_number == 0:
+    def _smart_initialization(self, instance, trial, circuit, layer):
+        if layer == 0:
             return np.pi * np.random.uniform(0, 2, len(circuit.get_parameters(format='flatlist')))
         else:
             previous_parameters = read_data('MaxCutDatabase', 'MaxCutDatabase', ['parameters'],
-                                                { 'instance': instance, 'trial':trial, 'layer_number': f'{int(self.layer_number)-1}'})
-            np.random.seed(self.layer_number*instance*trial)
+                                                { 'instance': instance, 'trial':trial, 'layer_number': f'{int(layer)-1}'})
+            np.random.seed(layer*instance*trial)
             previous_parameters = np.array([json.loads(previous_parameters[j][0]) for j in range(len(previous_parameters))])
             added_parameters = np.pi * np.random.uniform(0, 2, len(circuit.get_parameters(format='flatlist'))- len(previous_parameters[0]))
         return np.append(previous_parameters, added_parameters)
