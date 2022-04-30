@@ -61,7 +61,7 @@ class RandomGraphs(object):
         return my_quadratic_program.to_ising()[0].to_matrix()
 
     @staticmethod
-    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (0, 1),
+    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-1, 1),
                        integer_weights: Optional[bool] = False,
                        seed: Optional[int] = None, softmax=False) -> nx.Graph:
         """

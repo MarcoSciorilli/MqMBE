@@ -41,9 +41,9 @@ class Benchmarker(object):
         self.hyperparameters = hyperparameters
         self.shuffle = shuffle
         self.same_letter = same_letter
-
+        self.qubits = qubits
         if self.compression is not None:
-            if qubits is None:
+            if self.qubits is None:
                 if self.lower_order_terms:
                     self.qubits = math.ceil(max(self.solve_quadratic(1, 1, -2 / 3 * self.nodes_number)))
                 else:
@@ -55,7 +55,7 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits < 15:
+        if self.qubits is None or self.qubits < 15:
             qibo.set_backend("numpy")
             my_time = time()
             self._eigensolver_evaluater_parallel()
@@ -87,21 +87,23 @@ class Benchmarker(object):
 
     def _eigensolver_evaluater_serial(self):
         if self.graph_dict is not None:
-            for instance in self.graph_dict:
-                if self.graph_dict[instance].number_of_nodes() < 20:
-                    self.kind = 'bruteforce'
-                    # fix name of graph and add non bruteforce
-                    self._single_graph_evaluation(instance, self.trials, instance, self.layer_number[0])
-        for layer in self.layer_number:
-            print(f'Layer number:{layer}')
-            for trial in range(self.trials):
+            for layer in self.layer_number:
                 for instance in range(self.starting, self.ending):
-                    self._single_graph_evaluation(instance, trial, self.graph_dict, layer)
+                    for graph in self.graph_dict:
+                        for trial in range(self.trials):
+                            self._single_graph_evaluation(instance, trial, (graph, self.graph_dict[graph]), layer)
+        else:
+            for layer in self.layer_number:
+                print(f'Layer number:{layer}')
+                for trial in range(self.trials):
+                    for instance in range(self.starting, self.ending):
+                        self._single_graph_evaluation(instance, trial, self.graph_dict, layer)
 
 
     def _single_graph_evaluation(self, instance, trial, graph, layer):
         if graph is None:
             graph, instance = self._do_graph(instance)
+            instance_name = str(instance)
         else:
             instance_name = graph[0]
             graph = graph[1]
@@ -164,12 +166,10 @@ class Benchmarker(object):
                     unrounded_solution), str(solution)
                 energy_ratio = (cut - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
                 activation_function_name = self.activation_function.__name__
-                hyperparameters = str(self.hyperparameters)
             if max_energy == energy_ratio:
                 energy_ratio = 'None'
 
-        if graph is not None:
-            instance = instance_name
+        instance = instance_name
         row = {'kind': self.kind, 'instance': str(instance), 'trial': trial, 'layer_number': layer,
                'nodes_number': self.nodes_number, 'optimization': self.optimization,
                'activation_function': str(activation_function_name),
@@ -179,7 +179,7 @@ class Benchmarker(object):
                'unrounded_solution': unrounded_solution,
                'max_energy': max_energy, 'min_energy': min_energy, 'energy_ratio': energy_ratio,
                'initial_parameters': initial_parameters, 'parameters': parameters,
-               'number_parameters': number_parameters, 'hyperparameter': hyperparameters,
+               'number_parameters': number_parameters, 'hyperparameter': str(self.hyperparameters),
                'epochs': epochs, 'time': timing}
         insert_value_table('MaxCutDatabase', 'MaxCutDatabase', row)
 
