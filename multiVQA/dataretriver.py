@@ -199,10 +199,12 @@ class Benchmarker(object):
 
     def _do_graph(self, instance):
         true_random_graphs = False
-
+        fully_connected = False
         if self.graph_kind == 'random':
             true_random_graphs = True
-        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs).graph
+        if self.graph_kind == 'fully':
+            fully_connected = True
+        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs, fully_connected).graph
         if true_random_graphs:
             instance = graph.return_index()
         return graph, instance

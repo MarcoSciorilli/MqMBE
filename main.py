@@ -21,22 +21,20 @@ if __name__ == '__main__':
     # graph_dict["w09_100.0"] = (nx.read_weighted_edgelist("w09_100.0"))
     # graph_dict["w09_100.1"] = (nx.read_weighted_edgelist("w09_100.1"))
     # graph_dict["w09_100.2"] = (nx.read_weighted_edgelist("w09_100.2"))
-    #vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
+    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
 
-    for i in range(4, 85):
-        print(f'Nodes number:{i}')
-        vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='goemans_williamson')
+    # for i in range(4, 85):
+    #     print(f'Nodes number:{i}')
+    #     vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='goemans_williamson')
     # for k in [4,5]:
-    #     for i in range(10, 19):
-    #         print(f'Nodes number:{i}')
-    #         for j in range(0, 5):
-    #             print(f'Layer number:{j}')
-    #             vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='multibaseVQA',
-    #                                         layer_number=j, optimization='SLSQP', compression=2,
-    #                                         entanglement='article',
-    #                                         activation_function=np.tanh, hyperparameters=[1.5, 1], shuffle=True, qubits=k)
+    for i in [9, 18, 30, 45]:
+        print(f'Nodes number:{i}')
+        vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='multibaseVQA',
+                                    layer_number=list(range(0,5)), optimization='SLSQP', compression=2,
+                                    entanglement='article',
+                                    activation_function=np.tanh, hyperparameters=[1.5, 2])
 
 
     # vq.dataretriver.Benchmarker(starting=0, ending=1, trials=20, graph_dict=graph_dict, nodes_number=100, kind='multibaseVQA',

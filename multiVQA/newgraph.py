@@ -8,14 +8,16 @@ from itertools import combinations, groupby
 
 class RandomGraphs(object):
     def __init__(self, index: int, nodes_number: int, true_random: Optional[bool] = False,
-                 softmax: Optional[bool] = False):
+                 softmax: Optional[bool] = False, fully_connected = False):
         self.index = index
         self.nodes_number = nodes_number
+        self.fully_connected = fully_connected
         if true_random:
             np.random.seed(np.randint(0))
             self.index = np.randint(0)
         self.softmax = softmax
         self.graph = self.create_graph()
+
 
     @staticmethod
     def complete_graph_instantiater(number: int = 50, size: int = 10) -> List:
@@ -61,8 +63,8 @@ class RandomGraphs(object):
         return my_quadratic_program.to_ising()[0].to_matrix()
 
     @staticmethod
-    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-1, 1),
-                       integer_weights: Optional[bool] = False,
+    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-10, 10),
+                       integer_weights: Optional[bool] = True,
                        seed: Optional[int] = None, softmax=False) -> nx.Graph:
         """
         Takes an unweighted input graph and returns a weighted graph where the weights are uniformly sampled at random
@@ -137,10 +139,12 @@ class RandomGraphs(object):
         :return: A graph
         """
         # Initialise the probability of each node of having an edge with a neighbour
-        p = 1
-        # Fix the probability if the same seed is used
-        np.random.seed(self.index)
-        p = np.random.uniform(0, 1)
+        if self.fully_connected:
+            p = 1
+        else:
+            # Fix the probability if the same seed is used
+            np.random.seed(self.index)
+            p = np.random.uniform(0, 1)
         # Create the graph unweighted
         dummy_graph = self.gnp_random_connected_graph(self.nodes_number, p, self.index)
         # Assign weight to the edges
