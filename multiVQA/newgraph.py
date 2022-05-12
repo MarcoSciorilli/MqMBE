@@ -18,7 +18,6 @@ class RandomGraphs(object):
         self.softmax = softmax
         self.graph = self.create_graph()
 
-
     @staticmethod
     def complete_graph_instantiater(number: int = 50, size: int = 10) -> List:
         """
@@ -63,7 +62,7 @@ class RandomGraphs(object):
         return my_quadratic_program.to_ising()[0].to_matrix()
 
     @staticmethod
-    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-10, 10),
+    def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-10.0, 10.0),
                        integer_weights: Optional[bool] = True,
                        seed: Optional[int] = None, softmax=False) -> nx.Graph:
         """
@@ -83,8 +82,7 @@ class RandomGraphs(object):
         # Per each edge, assign a weight
         for edge in weighted_graph.edges:
             if integer_weights:
-                weighted_graph[edge[0]][edge[1]]['weight'] = np.random.randint(int(weight_range[0]),
-                                                                               int(weight_range[1]))
+                weighted_graph[edge[0]][edge[1]]['weight'] = np.random.randint(int(weight_range[0]),int(weight_range[1]))
             else:
                 weighted_graph[edge[0]][edge[1]]['weight'] = np.random.uniform(weight_range[0], weight_range[1])
         # If softmax is True, perform a softmax transformation of the weights

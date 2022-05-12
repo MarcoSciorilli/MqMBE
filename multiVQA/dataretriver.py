@@ -126,7 +126,10 @@ class Benchmarker(object):
                 energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
             else:
-                adjacency_matrix, max_eigenvalue = self._graph_to_dict(graph)
+                if self.graph_dict is None:
+                    adjacency_matrix, max_eigenvalue = self._graph_to_dict(graph)
+                else:
+                    adjacency_matrix, max_eigenvalue = self._graph_to_dict_given(graph)
                 if self.kind == 'classicVQE':
                     self.pauli_string_length = 1
                     self.ratio_total_words = 1 / 3
@@ -197,6 +200,23 @@ class Benchmarker(object):
                 edges[(i, j)] = adjacency_matrix[i][j]
         return edges, max_eigenvalue #(max_eigenvalue+min_eigenvalue)/2
 
+    def _graph_to_dict_given(self, graph):
+        adj_matrix = np.zeros(shape=[int(max(graph.adj)) + 1, int(max(graph.adj)) + 1])
+        for i in graph.adj:
+            for j in graph.adj[i]:
+                if graph.adj[i][j]['weight'] == 0:
+                    continue
+                adj_matrix[int(i) - 1, int(j) - 1] = graph.adj[i][j]['weight']
+        eigenvalues, _ = np.linalg.eig(adj_matrix)
+        max_eigenvalue = np.max(eigenvalues)
+        edges = {}
+        for i in range(adj_matrix.shape[0]):
+            for j in range(i):
+                if adj_matrix[i][j] == 0:
+                    continue
+                edges[(i, j)] = adj_matrix[i][j]
+        return edges, max_eigenvalue #(max_eigenvalue+min_eigenvalue)/2
+
     def _do_graph(self, instance):
         true_random_graphs = False
         fully_connected = False
@@ -204,7 +224,7 @@ class Benchmarker(object):
             true_random_graphs = True
         if self.graph_kind == 'fully':
             fully_connected = True
-        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs, fully_connected).graph
+        graph = RandomGraphs(instance, self.nodes_number, true_random_graphs, fully_connected=fully_connected).graph
         if true_random_graphs:
             instance = graph.return_index()
         return graph, instance
