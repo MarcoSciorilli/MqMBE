@@ -21,7 +21,7 @@ if __name__ == '__main__':
     graph_dict["w09_100.0"] = (nx.read_weighted_edgelist("w09_100.0"))
     graph_dict["w09_100.1"] = (nx.read_weighted_edgelist("w09_100.1"))
     graph_dict["w09_100.2"] = (nx.read_weighted_edgelist("w09_100.2"))
-    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
+    #vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
 

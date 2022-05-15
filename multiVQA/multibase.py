@@ -56,8 +56,8 @@ class MultibaseVQA(object):
             # where (0, 1, 2, 3) -> 1XYZ and so on
             from qibo import hamiltonians
             import numpy as np
-            pauli_matrices = [I, X, Y, Z]
-            word = 1
+            pauli_matrices = np.array([I, X, Y, Z])
+            word = np.intc(1)
             for qubit, i in enumerate(indices):
                 word *= pauli_matrices[i](qubit + int(k))
             return hamiltonians.SymbolicHamiltonian(word)

@@ -14,11 +14,11 @@ import json
 
 class Benchmarker(object):
 
-    def __init__(self, kind, nodes_number, starting, ending, trials=1, layer_number=None, optimization='None',
+    def __init__(self, kind, nodes_number, starting=0, ending=100, trials=1, layer_number=None, optimization='None',
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
-                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True):
+                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits'):
 
         if layer_number is None:
             layer_number = ['None']
@@ -42,6 +42,7 @@ class Benchmarker(object):
         self.shuffle = shuffle
         self.same_letter = same_letter
         self.qubits = qubits
+        self.precision = precision
         if self.compression is not None:
             if self.qubits is None:
                 if self.lower_order_terms:
@@ -69,12 +70,11 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 96
+        process_number = 20
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
-            [pool.apply_async(self._single_graph_evaluation, (instance, trial, (graph, self.graph_dict[graph]), layer)) for layer in
-             self.layer_number for instance in
-             range(self.starting, self.ending) for graph in self.graph_dict for trial in range(self.trials)]
+            [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
+             self.layer_number for graph in self.graph_dict for trial in range(self.trials)]
         #     self.kind = 'bruteforce'
         #     [pool.apply_async(self._single_graph_evaluation, (instance, self.trials,
         #                                                       self.graph_dict[instance])) for instance in
@@ -88,10 +88,9 @@ class Benchmarker(object):
     def _eigensolver_evaluater_serial(self):
         if self.graph_dict is not None:
             for layer in self.layer_number:
-                for instance in range(self.starting, self.ending):
-                    for graph in self.graph_dict:
-                        for trial in range(self.trials):
-                            self._single_graph_evaluation(instance, trial, (graph, self.graph_dict[graph]), layer)
+                for graph in self.graph_dict:
+                    for trial in range(self.trials):
+                        self._single_graph_evaluation(0, trial, (graph, self.graph_dict[graph]), layer)
         else:
             for layer in self.layer_number:
                 print(f'Layer number:{layer}')
@@ -127,9 +126,15 @@ class Benchmarker(object):
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
             else:
                 if self.graph_dict is None:
-                    adjacency_matrix, max_eigenvalue = self._graph_to_dict(graph)
+                    if self.precision == '32-bits':
+                        adjacency_matrix, max_eigenvalue = self._graph_to_dict_32(graph)
+                    else:
+                        adjacency_matrix, max_eigenvalue = self._graph_to_dict(graph)
                 else:
-                    adjacency_matrix, max_eigenvalue = self._graph_to_dict_given(graph)
+                    if self.precision == '32-bits':
+                        adjacency_matrix, max_eigenvalue = self._graph_to_dict_given_32(graph)
+                    else:
+                        adjacency_matrix, max_eigenvalue = self._graph_to_dict_given(graph)
                 if self.kind == 'classicVQE':
                     self.pauli_string_length = 1
                     self.ratio_total_words = 1 / 3
@@ -138,9 +143,13 @@ class Benchmarker(object):
                 qubits = self.qubits
                 circuit = var_form(qubits, layer, self.entanglement)
                 if self.initial_parameters == 'None':
-                    initial_parameters = np.pi * np.random.uniform(0, 2, len(circuit.get_parameters(format='flatlist')))
+                    initial_parameters = np.pi * np.random.uniform(-1, 1, len(circuit.get_parameters(format='flatlist')))
                 else:
                     initial_parameters = self._smart_initialization(instance, trial, circuit)
+
+                if self.precision == '32-bits':
+                    initial_parameters = np.float32(initial_parameters)
+                    self.hyperparameters = np.float32(self.hyperparameters)
 
                 solver = MultibaseVQA(circuit, adjacency_matrix, max_eigenvalue, hyperparameters=self.hyperparameters)
                 if self.compression is not None:
@@ -153,7 +162,7 @@ class Benchmarker(object):
 
                 my_time = time()
                 result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
-                                                                                               method=self.optimization,
+                                                                                               method=self.optimization, bounds=((-np.pi, np.pi) for i in range(len(initial_parameters))),
                                                                                                options={
                                                                                                    'maxiter': 1000000000})
                 timing = time() - my_time
@@ -216,6 +225,36 @@ class Benchmarker(object):
                     continue
                 edges[(i, j)] = adj_matrix[i][j]
         return edges, max_eigenvalue #(max_eigenvalue+min_eigenvalue)/2
+
+    def _graph_to_dict_32(self, graph):
+        eigenvalues, _ = np.linalg.eig(nx.to_numpy_matrix(graph))
+        max_eigenvalue = np.max(eigenvalues)
+        min_eigenvalue = np.min(eigenvalues)
+        adjacency_matrix = nx.to_numpy_array(graph)
+        edges = {}
+        for i in range(adjacency_matrix.shape[0]):
+            for j in range(i):
+                if adjacency_matrix[i][j] == 0:
+                    continue
+                edges[(np.int32(i), np.int32(j))] = np.float32(adjacency_matrix[i][j])
+        return edges, np.float32(max_eigenvalue) #(max_eigenvalue+min_eigenvalue)/2
+
+    def _graph_to_dict_given_32(self, graph):
+        adj_matrix = np.zeros(shape=[int(max(graph.adj)) + 1, int(max(graph.adj)) + 1])
+        for i in graph.adj:
+            for j in graph.adj[i]:
+                if graph.adj[i][j]['weight'] == 0:
+                    continue
+                adj_matrix[int(i) - 1, int(j) - 1] = graph.adj[i][j]['weight']
+        eigenvalues, _ = np.linalg.eig(adj_matrix)
+        max_eigenvalue = np.max(eigenvalues)
+        edges = {}
+        for i in range(adj_matrix.shape[0]):
+            for j in range(i):
+                if adj_matrix[i][j] == 0:
+                    continue
+                edges[(np.int32(i), np.int32(j))] = np.float32(adj_matrix[i][j])
+        return edges, np.float32(max_eigenvalue) #(max_eigenvalue+min_eigenvalue)/2
 
     def _do_graph(self, instance):
         true_random_graphs = False
