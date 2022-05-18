@@ -70,7 +70,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 20
+        process_number = 96
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in

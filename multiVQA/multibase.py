@@ -182,7 +182,7 @@ class MultibaseVQA(object):
                 penalization += ((node_mapping[i].expectation(final_state))**2)#- (self.hyperparameters[1]/(len(node_mapping)))) ** 2
             return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
 
-        def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping):
+        def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, max_eigenvalue):
             # defines loss function with given activation function
             circuit.set_parameters(params)
             final_state = circuit.execute().tensor
@@ -191,12 +191,14 @@ class MultibaseVQA(object):
             products_vector = tf.einsum('ik,k->i', right_side, final_state_conj)
             node_mapping_expectation = tf.math.real(products_vector)
 
-            first_term = tf.math.tanh(tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0]))
-            second_term = tf.math.tanh(tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1]))
+            first_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5),tf.constant(circuit.qubits)), tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0])))
+            second_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5),tf.constant(circuit.qubits)),tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1])))
             loss = tf.math.multiply(tensor_ad_mat_weights, first_term)
             loss = tf.math.multiply(loss, second_term)
             loss = tf.math.reduce_sum(loss)
-            return loss
+
+            penalization_loss = tf.math.multiply(tf.math.multiply(tf.constant(2), max_eigenvalue), tf.math.reduce_sum(tf.math.square(node_mapping_expectation)))
+            return tf.math.add(loss, penalization_loss)
 
         def _cut_value(params, circuit):
             # calculates the cut value (as the name would suggest)
@@ -243,7 +245,7 @@ class MultibaseVQA(object):
                 node_mapping = tf.stack(node_mapping)
                 tensor_ad_mat_edges = tf.convert_to_tensor(tensor_ad_mat_egdes)
                 tensor_ad_mat_weights = tf.convert_to_tensor(tensor_ad_mat_weight)
-                args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping)
+                args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, tf.contant(self.max_eigenvalue))
                 # TO HAVE ACCEPTABE COMPUTATIONAL TIME, ACCURACY BASED STOPPING CRITERION MUST BE IMPLEMENTED
                 options = { 'optimizer' : 'SGD'}
             else:
