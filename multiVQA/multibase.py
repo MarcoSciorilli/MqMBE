@@ -20,6 +20,7 @@ class MultibaseVQA(object):
         self.max_eigenvalue = max_eigenvalue
         self.hyperparameters = hyperparameters
 
+
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
         # return the number of qubits necessary
@@ -51,7 +52,7 @@ class MultibaseVQA(object):
 
     def encode_nodes(self, num_nodes, pauli_string_length, ratio_total_words=None, compression=None, lower_order_terms=False, shuffle=True, seed=0, same_letter=True):
 
-        def get_pauli_word(indices, k):
+        def get_pauli_word(indices, k, qubits=None):
             # Generate pauli string corresponding to indices
             # where (0, 1, 2, 3) -> 1XYZ and so on
             from qibo import hamiltonians
@@ -60,18 +61,22 @@ class MultibaseVQA(object):
             word = np.intc(1)
             for qubit, i in enumerate(indices):
                 word *= pauli_matrices[i](qubit + int(k))
+            if qubits:
+                qubits_list = list(range(qubits))
+                qubits_list.remove(int(k))
+                for j in qubits_list:
+                    word *= pauli_matrices[0](j)
             return hamiltonians.SymbolicHamiltonian(word)
 
         if compression is None:
-            # count number of strings per word length to be used
-            num_strings = round((4 ** pauli_string_length - 1) * ratio_total_words)
-            # generate list of all indices of given length
-            indices = list(ndindex(*[4] * pauli_string_length))
-            pauli_strings = [x for _, x in sorted(zip([len(i) - i.count(0) for i in indices], indices))]
 
+            pauli_strings = self._pauli_string_same_letter(pauli_string_length, 1, True, shuffle, seed, pauli_letters=int(ratio_total_words*3+1))
+
+            num_strings = len(pauli_strings)
+
+            # position i stores string corresponding to the i-th node.
             self.node_mapping = [
-                get_pauli_word(pauli_strings[int(i % num_strings + 1)], pauli_string_length * floor(i / num_strings))
-                for i
+                get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings), self.get_num_qubits(num_nodes, pauli_string_length,ratio_total_words)) for i
                 in range(num_nodes)]
         else:
             if same_letter:
@@ -95,13 +100,13 @@ class MultibaseVQA(object):
         self.circuit = circuit
 
     @staticmethod
-    def _pauli_string_same_letter(pauli_string_length, order, lower_order_terms, shuffle, seed):
+    def _pauli_string_same_letter(pauli_string_length, order, lower_order_terms, shuffle, seed, pauli_letters=4):
         pauli_string = []
         if lower_order_terms:
             smallest_lenght = 1
         else:
             smallest_lenght = order
-        for i in range(1, 4):
+        for i in range(1, pauli_letters):
             for k in range(smallest_lenght, order + 1):
                 comb = combinations(list(range(pauli_string_length)), k)
                 for positions in comb:
@@ -138,6 +143,7 @@ class MultibaseVQA(object):
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
                  options=None, processes=None, compile=False):
+
         '''
         def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
             if len(self.parameter_iteration) > 1:
@@ -172,33 +178,54 @@ class MultibaseVQA(object):
             # defines loss function with given activation function
             circuit.set_parameters(params)
             final_state = circuit()
+            qubits = circuit.nqubits
             loss = 0
-
             for i in adjacency_matrix:
-                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)*self.hyperparameters[0]*circuit.nqubits) \
-                        * activation_function(node_mapping[i[1]].expectation(final_state)*self.hyperparameters[0]*circuit.nqubits)
+                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)*self.hyperparameters[0]*qubits) \
+                        * activation_function(node_mapping[i[1]].expectation(final_state)*self.hyperparameters[0]*qubits)
+
             penalization = 0
             for i in range(len(node_mapping)):
-                penalization += ((node_mapping[i].expectation(final_state))**2)#- (self.hyperparameters[1]/(len(node_mapping)))) ** 2
+                penalization += ((node_mapping[i].expectation(final_state))**2)
             return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
 
         def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, max_eigenvalue):
             # defines loss function with given activation function
+            # Set the parameters of the circuit
             circuit.set_parameters(params)
-            final_state = circuit.execute().tensor
-            final_state_conj = tf.math.conj(final_state)
-            right_side = tf.einsum('ijk,k->ij', node_mapping, final_state)
-            products_vector = tf.einsum('ik,k->i', right_side, final_state_conj)
-            node_mapping_expectation = tf.math.real(products_vector)
+            # final_state = circuit.execute()
 
-            first_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5),tf.constant(circuit.qubits)), tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0])))
-            second_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5),tf.constant(circuit.qubits)),tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1])))
+            # Get the final statevector, and its conjugate
+            final_state = circuit.execute().tensor
+            # final_state_conj = tf.math.conj(final_state)
+
+            # Measure it on the obervables used for the encoding
+            # right_side = tf.einsum('ijk,k->ij', node_mapping, final_state)
+            # products_vector = tf.einsum('ik,k->i', right_side, final_state_conj)
+            # node_mapping_expectation = tf.math.real(products_vector)
+            # print(len([i.expectation(final_state) for i in node_mapping]))
+            # node_mapping_expectation = tf.constant([i.expectation(final_state).numpy() for i in node_mapping])
+
+            nodes = (tf.constant(0), tf.constant(tf.zeros([len(node_mapping)], dtype=np.float64)))
+            c = lambda i, p: i < len(node_mapping)
+            b = lambda i, p: (i + 1, tf.tensor_scatter_nd_update(p, [[i]], [node_mapping[i].expectation(final_state)]))
+            node_mapping_expectation = tf.while_loop(c, b, nodes)[1]
+            first_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)), tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0])))
+            second_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)),tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1])))
             loss = tf.math.multiply(tensor_ad_mat_weights, first_term)
             loss = tf.math.multiply(loss, second_term)
             loss = tf.math.reduce_sum(loss)
 
-            penalization_loss = tf.math.multiply(tf.math.multiply(tf.constant(2), max_eigenvalue), tf.math.reduce_sum(tf.math.square(node_mapping_expectation)))
+            penalization_loss = tf.math.multiply(tf.math.multiply(tf.constant(2.0,dtype=tf.float64), tf.math.abs(max_eigenvalue)), tf.math.reduce_sum(tf.math.square(node_mapping_expectation)))
             return tf.math.add(loss, penalization_loss)
+
+            # first_term = tf.math.tanh( tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0]))
+            # second_term = tf.math.tanh(tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1]))
+            # loss = tf.math.multiply(tensor_ad_mat_weights, first_term)
+            # loss = tf.math.multiply(loss, second_term)
+            # loss = tf.math.reduce_sum(loss)
+            #
+            # return loss
 
         def _cut_value(params, circuit):
             # calculates the cut value (as the name would suggest)
@@ -241,13 +268,13 @@ class MultibaseVQA(object):
                 for i in self.adjacency_matrix:
                     tensor_ad_mat_egdes.append([i[0], i[1]])
                     tensor_ad_mat_weight.append(self.adjacency_matrix[i])
-                node_mapping = [tf.convert_to_tensor(i.matrix) for i in self.node_mapping]
-                node_mapping = tf.stack(node_mapping)
+                # node_mapping = [tf.convert_to_tensor(i.matrix) for i in self.node_mapping]
+                # node_mapping = tf.stack(node_mapping)
+                node_mapping = self.node_mapping
                 tensor_ad_mat_edges = tf.convert_to_tensor(tensor_ad_mat_egdes)
-                tensor_ad_mat_weights = tf.convert_to_tensor(tensor_ad_mat_weight)
-                args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, tf.contant(self.max_eigenvalue))
-                # TO HAVE ACCEPTABE COMPUTATIONAL TIME, ACCURACY BASED STOPPING CRITERION MUST BE IMPLEMENTED
-                options = { 'optimizer' : 'SGD'}
+                tensor_ad_mat_weights = tf.convert_to_tensor(tensor_ad_mat_weight, dtype=tf.float64)
+                args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, tf.constant(self.max_eigenvalue, dtype=tf.float64))
+                options = { 'optimizer' : 'Nadam', "learning_rate": 0.01,'beta_2':0.01, 'beta_1':0.1, "nepochs": 10000}
             else:
                 loss = _loss
                 args = (self.circuit, self.adjacency_matrix, self.activation_function,self.node_mapping)

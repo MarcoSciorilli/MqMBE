@@ -18,7 +18,7 @@ class Benchmarker(object):
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
-                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits'):
+                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits', database_name='MaxCutDatabase'):
 
         if layer_number is None:
             layer_number = ['None']
@@ -43,6 +43,7 @@ class Benchmarker(object):
         self.same_letter = same_letter
         self.qubits = qubits
         self.precision = precision
+        self.database_name = database_name
         if self.compression is not None:
             if self.qubits is None:
                 if self.lower_order_terms:
@@ -56,21 +57,25 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits is None or self.qubits < 15:
-            qibo.set_backend("numpy")
-            my_time = time()
-            self._eigensolver_evaluater_parallel()
-            print("Total time:", time() - my_time)
-        else:
-            qibo.set_backend("numpy")
-            my_time = time()
-            self._eigensolver_evaluater_serial()
-            print("Total time:", time() - my_time)
+        # if self.qubits is None or self.qubits < 15:
+        #     qibo.set_backend("numpy")
+        #     #if precision == '32-bits':
+        #     qibo.set_precision('single')
+        #     my_time = time()
+        #     self._eigensolver_evaluater_parallel()
+        #     print("Total time:", time() - my_time)
+        # else:
+        qibo.set_backend("tensorflow")
+        if precision == '32-bits':
+            qibo.set_precision('single')
+        my_time = time()
+        self._eigensolver_evaluater_serial()
+        print("Total time:", time() - my_time)
 
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 96
+        process_number = 20
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
@@ -115,7 +120,7 @@ class Benchmarker(object):
             max_energy, min_energy, solution, energy_ratio = result[0], result[1], result[2], 1
             qubits, self.compression, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
         else:
-            np.random.seed(trial)
+            np.random.seed(trial+instance)
             result_exact = self._get_exact_solution(instance)
             if self.kind == 'goemans_williamson':
                 my_time = time()
@@ -126,12 +131,12 @@ class Benchmarker(object):
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
             else:
                 if self.graph_dict is None:
-                    if self.precision == '32-bits':
+                    if self.precision == '32-bits_':
                         adjacency_matrix, max_eigenvalue = self._graph_to_dict_32(graph)
                     else:
                         adjacency_matrix, max_eigenvalue = self._graph_to_dict(graph)
                 else:
-                    if self.precision == '32-bits':
+                    if self.precision == '32-bits_':
                         adjacency_matrix, max_eigenvalue = self._graph_to_dict_given_32(graph)
                     else:
                         adjacency_matrix, max_eigenvalue = self._graph_to_dict_given(graph)
@@ -147,9 +152,10 @@ class Benchmarker(object):
                 else:
                     initial_parameters = self._smart_initialization(instance, trial, circuit)
 
-                if self.precision == '32-bits':
+                if self.precision == '32-bits_':
                     initial_parameters = np.float32(initial_parameters)
                     self.hyperparameters = np.float32(self.hyperparameters)
+
 
                 solver = MultibaseVQA(circuit, adjacency_matrix, max_eigenvalue, hyperparameters=self.hyperparameters)
                 if self.compression is not None:
@@ -162,9 +168,8 @@ class Benchmarker(object):
 
                 my_time = time()
                 result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
-                                                                                               method=self.optimization, bounds=((-np.pi, np.pi) for i in range(len(initial_parameters))),
-                                                                                               options={
-                                                                                                   'maxiter': 1000000000})
+                                                                                               method=self.optimization, bounds=((-np.pi, np.pi) for i in range(len(initial_parameters))), tol=1e-03,
+                                                                                               options={'maxiter': 1000000000})
                 timing = time() - my_time
 
                 print(timing)
@@ -172,6 +177,8 @@ class Benchmarker(object):
                     epochs = extra[1].result[3]
                 elif self.optimization != 'sgd':
                     epochs = extra['nfev']
+                else:
+                    epochs = extra
 
                 max_energy, min_energy, number_parameters, initial_parameters, parameters, unrounded_solution, solution = cut, 'None', len(
                     initial_parameters), str(initial_parameters.tolist()), str(parameters.tolist()), str(
@@ -193,7 +200,7 @@ class Benchmarker(object):
                'initial_parameters': initial_parameters, 'parameters': parameters,
                'number_parameters': number_parameters, 'hyperparameter': str(self.hyperparameters),
                'epochs': epochs, 'time': timing}
-        insert_value_table('MaxCutDatabase', 'MaxCutDatabase', row)
+        insert_value_table(self.database_name, self.database_name, row)
 
 
     def _graph_to_dict(self, graph):
@@ -269,7 +276,7 @@ class Benchmarker(object):
         return graph, instance
 
     def _get_exact_solution(self,instance):
-        result_exact = read_data('MaxCutDatabase', 'MaxCutDatabase', ['max_energy', 'min_energy'],
+        result_exact = read_data(self.database_name, self.database_name, ['max_energy', 'min_energy'],
                                                 {'kind': 'bruteforce', 'instance': instance,
                                                  'nodes_number': self.nodes_number,
                                                  'graph_kind': self.graph_kind})
@@ -281,7 +288,7 @@ class Benchmarker(object):
         if layer == 0:
             return np.pi * np.random.uniform(0, 2, len(circuit.get_parameters(format='flatlist')))
         else:
-            previous_parameters = read_data('MaxCutDatabase', 'MaxCutDatabase', ['parameters'],
+            previous_parameters = read_data(self.database_name, self.database_name, ['parameters'],
                                                 { 'instance': instance, 'trial':trial, 'layer_number': f'{int(layer)-1}'})
             np.random.seed(layer*instance*trial)
             previous_parameters = np.array([json.loads(previous_parameters[j][0]) for j in range(len(previous_parameters))])

@@ -4,8 +4,10 @@ if __name__ == '__main__':
 
     import multiVQA as vq
     import numpy as np
+    import os
     import scipy.optimize
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
     from multiVQA.datamanager import read_data
     def nodes_compressed(quibits):
         return int((3 * (quibits ** 2 + quibits) / 2))
@@ -16,12 +18,20 @@ if __name__ == '__main__':
 
 
     import networkx as nx
+    # vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_sgd')
+
 
     graph_dict = {}
     graph_dict["w09_100.0"] = (nx.read_weighted_edgelist("w09_100.0"))
     graph_dict["w09_100.1"] = (nx.read_weighted_edgelist("w09_100.1"))
     graph_dict["w09_100.2"] = (nx.read_weighted_edgelist("w09_100.2"))
-    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase')
+
+    vq.dataretriver.Benchmarker(starting=10, ending=11, trials=20, graph_dict=graph_dict, nodes_number=100,
+                                kind='multibaseVQA',
+                                layer_number=list(range(15, 16)), optimization='sgd', compression=2,
+                                entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2],
+                                database_name='MaxCutDatabase_100_sgd')
+
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
 
@@ -48,10 +58,10 @@ if __name__ == '__main__':
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='multibaseVQA',
     #                                 layer_number=list(range(1,11)), optimization='SLSQP', compression=2,
     #                                 entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2], graph_kind='fully')
-
-    vq.dataretriver.Benchmarker(starting=10, ending=11, trials=20, graph_dict=graph_dict, nodes_number=100, kind='multibaseVQA',
-                                layer_number=list(range(0,20)), optimization='SLSQP', compression=2,
-                                entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2])
+    # for i in [9, 18, 30, 45]:
+    #     vq.dataretriver.Benchmarker(starting=0, ending=10, trials=5, nodes_number=i, kind='multibaseVQA',
+    #                                 layer_number=list(range(0, 5)), optimization='SLSQP', compression=2,
+    #                                 entanglement='article', activation_function=np.tanh, hyperparameters=[1.5,2], database_name='MaxCutDatabase_negative_integer')
 
     # def fine_tuner(hyperparameters, layers, nodes):
     #     def func(hyperparameters, layers, nodes):
