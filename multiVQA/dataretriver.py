@@ -18,7 +18,7 @@ class Benchmarker(object):
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
-                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits', database_name='MaxCutDatabase'):
+                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits', database_name='MaxCutDatabase', warmup = False):
 
         if layer_number is None:
             layer_number = ['None']
@@ -44,6 +44,7 @@ class Benchmarker(object):
         self.qubits = qubits
         self.precision = precision
         self.database_name = database_name
+        self.warmup = warmup
         if self.compression is not None:
             if self.qubits is None:
                 if self.lower_order_terms:
@@ -65,7 +66,7 @@ class Benchmarker(object):
         #     self._eigensolver_evaluater_parallel()
         #     print("Total time:", time() - my_time)
         # else:
-        qibo.set_backend("tensorflow")
+        qibo.set_backend("numpy")
         if precision == '32-bits':
             qibo.set_precision('single')
         my_time = time()
@@ -152,6 +153,9 @@ class Benchmarker(object):
                 else:
                     initial_parameters = self._smart_initialization(instance, trial, circuit)
 
+
+
+
                 if self.precision == '32-bits_':
                     initial_parameters = np.float32(initial_parameters)
                     self.hyperparameters = np.float32(self.hyperparameters)
@@ -165,7 +169,31 @@ class Benchmarker(object):
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
 
                 solver.set_activation(self.activation_function)
+                my_time = time()
+                if self.warmup:
+                    import ast
+                    solution = read_data('MaxCutDatabase_gw', 'MaxCutDatabase_gw', ['solution'],
+                                                    {'instance': instance_name, 'trial': trial})
+                    solution = solution[0][0]
+                    solution = solution[:1] + solution[(1+1):]
+                    solution = str(solution).replace('  ', ',')
+                    solution = str(solution).replace(' ', ',')
+                    solution = ast.literal_eval(solution)
 
+                    # solution = np.array([json.loads(solution[0][0])])
+                    solver.set_approx_solution(solution)
+                    result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
+                                                                                                   method=self.optimization,
+                                                                                                   bounds=(
+                                                                                                   (-np.pi, np.pi) for i
+                                                                                                   in range(
+                                                                                                       len(initial_parameters))),
+                                                                                                   tol=1e-02,
+                                                                                                   options={
+                                                                                                       'maxiter': 1000000000}, warmup=self.warmup)
+                    initial_parameters = parameters
+                timing = time() - my_time
+                print(f'Warmup time:{timing}')
                 my_time = time()
                 result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
                                                                                                method=self.optimization, bounds=((-np.pi, np.pi) for i in range(len(initial_parameters))), tol=1e-03,

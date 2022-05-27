@@ -19,6 +19,7 @@ class MultibaseVQA(object):
         self.parameter_iteration = []
         self.max_eigenvalue = max_eigenvalue
         self.hyperparameters = hyperparameters
+        self.approx_solution = None
 
 
     @staticmethod
@@ -99,6 +100,9 @@ class MultibaseVQA(object):
     def set_circuit(self, circuit):
         self.circuit = circuit
 
+    def set_approx_solution(self, solution):
+        self.approx_solution = solution
+
     @staticmethod
     def _pauli_string_same_letter(pauli_string_length, order, lower_order_terms, shuffle, seed, pauli_letters=4):
         pauli_string = []
@@ -142,7 +146,7 @@ class MultibaseVQA(object):
         return pauli_string
     def minimize(self, initial_state, method='Powell', jac=None, hess=None,
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
-                 options=None, processes=None, compile=False):
+                 options=None, processes=None, compile=False, warmup = False):
 
         '''
         def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
@@ -180,14 +184,38 @@ class MultibaseVQA(object):
             final_state = circuit()
             qubits = circuit.nqubits
             loss = 0
+            node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
             for i in adjacency_matrix:
-                loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)*self.hyperparameters[0]*qubits) \
-                        * activation_function(node_mapping[i[1]].expectation(final_state)*self.hyperparameters[0]*qubits)
+                loss += adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
+                        * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits)
 
             penalization = 0
             for i in range(len(node_mapping)):
-                penalization += ((node_mapping[i].expectation(final_state))**2)
+                penalization += ((node_mapping_expectation[i])**2)
+            print(loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization)
             return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
+
+        def _loss_warmup(params, circuit, node_mapping, solution):
+            # defines loss function with given activation function
+            circuit.set_parameters(params)
+            final_state = circuit()
+            loss = 0
+            for i in range(len(node_mapping)):
+                loss += (node_mapping[i].expectation(final_state) - 0.1*solution[i])**2
+            print(loss)
+            return loss
+
+        def _loss_warmup_tensor(params, circuit, node_mapping, solution):
+            circuit.set_parameters(params)
+            final_state = circuit.execute().tensor
+            nodes = (tf.constant(0), tf.constant(tf.zeros([len(node_mapping)], dtype=np.float64)))
+            c = lambda i, p: i < len(node_mapping)
+            b = lambda i, p: (i + 1, tf.tensor_scatter_nd_update(p, [[i]], [node_mapping[i].expectation(final_state)]))
+            node_mapping_expectation = tf.while_loop(c, b, nodes)[1]
+            loss = tf.math.abs(tf.math.subtract(node_mapping_expectation,tf.math.multiply(tf.constant(0.1, dtype=tf.float64), solution)))
+            loss = tf.math.reduce_sum(loss)
+
+            return loss
 
         def _loss_tensor(params, circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, max_eigenvalue):
             # defines loss function with given activation function
@@ -260,30 +288,46 @@ class MultibaseVQA(object):
                 _ = gate.cache
             loss = K.compile(_loss)
         else:
-            if K.supports_gradients:
-                tf.debugging.set_log_device_placement(True)
-                loss = _loss_tensor
-                tensor_ad_mat_egdes = []
-                tensor_ad_mat_weight = []
-                for i in self.adjacency_matrix:
-                    tensor_ad_mat_egdes.append([i[0], i[1]])
-                    tensor_ad_mat_weight.append(self.adjacency_matrix[i])
-                # node_mapping = [tf.convert_to_tensor(i.matrix) for i in self.node_mapping]
-                # node_mapping = tf.stack(node_mapping)
-                node_mapping = self.node_mapping
-                tensor_ad_mat_edges = tf.convert_to_tensor(tensor_ad_mat_egdes)
-                tensor_ad_mat_weights = tf.convert_to_tensor(tensor_ad_mat_weight, dtype=tf.float64)
-                args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, tf.constant(self.max_eigenvalue, dtype=tf.float64))
-                options = { 'optimizer' : 'Nadam', "learning_rate": 0.01,'beta_2':0.01, 'beta_1':0.1, "nepochs": 10000}
-            else:
-                loss = _loss
-                args = (self.circuit, self.adjacency_matrix, self.activation_function,self.node_mapping)
+            if warmup:
+                if K.supports_gradients:
+                    tf.debugging.set_log_device_placement(True)
+                    loss = _loss_warmup_tensor
+                    self.approx_solution = tf.convert_to_tensor(self.approx_solution,  dtype=np.float64)
+                    node_mapping = self.node_mapping
+                    args = (self.circuit,  node_mapping,self.approx_solution)
+                    options = {'optimizer': 'Nadam', "learning_rate": 0.01, "nepochs": 100}
+                else:
+                    args = (self.circuit, self.node_mapping, self.approx_solution)
+                    loss = lambda p, c, ad, af,: K.to_numpy(_loss_warmup(p, c, ad, af))
 
-        if method == "cma":
-            dtype = getattr(K.np, K._dtypes.get('DTYPE'))
-            loss = lambda p, c, ad, af, nm: dtype(_loss(p, c, ad, af, nm))
-        elif method != "sgd":
-            loss = lambda p, c, ad, af, nm: K.to_numpy(_loss(p, c, ad, af, nm))
+
+            else:
+                if K.supports_gradients:
+                    tf.debugging.set_log_device_placement(True)
+                    loss = _loss_tensor
+                    tensor_ad_mat_egdes = []
+                    tensor_ad_mat_weight = []
+                    for i in self.adjacency_matrix:
+                        tensor_ad_mat_egdes.append([i[0], i[1]])
+                        tensor_ad_mat_weight.append(self.adjacency_matrix[i])
+                    # node_mapping = [tf.convert_to_tensor(i.matrix) for i in self.node_mapping]
+                    # node_mapping = tf.stack(node_mapping)
+                    if warmup:
+                        self.approx_solution = tf.convert_to_tensor(self.approx_solution)
+                    node_mapping = self.node_mapping
+                    tensor_ad_mat_edges = tf.convert_to_tensor(tensor_ad_mat_egdes)
+                    tensor_ad_mat_weights = tf.convert_to_tensor(tensor_ad_mat_weight, dtype=tf.float64)
+                    args = (self.circuit, tensor_ad_mat_edges, tensor_ad_mat_weights, node_mapping, tf.constant(self.max_eigenvalue, dtype=tf.float64))
+                    options = { 'optimizer' : 'Nadam', "learning_rate": 0.01,  "nepochs": 10000}
+                else:
+                    loss = _loss
+                    args = (self.circuit, self.adjacency_matrix, self.activation_function,self.node_mapping)
+                    if method == "cma":
+                        dtype = getattr(K.np, K._dtypes.get('DTYPE'))
+                        loss = lambda p, c, ad, af, nm: dtype(_loss(p, c, ad, af, nm))
+                    elif method != "sgd":
+                        loss = lambda p, c, ad, af, nm: K.to_numpy(_loss(p, c, ad, af, nm))
+
 
         result, parameters, extra = self.optimizers.optimize(loss, initial_state,
                                                              args=args,
