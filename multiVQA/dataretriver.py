@@ -201,7 +201,7 @@ class Benchmarker(object):
                     result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
                                                                                                    method=self.optimization,
                                                                                                    bounds=bounds,constraints=cons,
-                                                                                                   tol=1e-02,
+                                                                                                   tol=0.1,
                                                                                                    options={
                                                                                                        'maxiter': 1000000000}, warmup=self.warmup)
                     initial_parameters = parameters

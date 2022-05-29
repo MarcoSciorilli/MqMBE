@@ -192,7 +192,6 @@ class MultibaseVQA(object):
             penalization = 0
             for i in range(len(node_mapping)):
                 penalization += ((node_mapping_expectation[i])**2)
-            print(loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization)
             return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
 
         def _loss_warmup(params, circuit, node_mapping, solution):
@@ -202,7 +201,6 @@ class MultibaseVQA(object):
             loss = 0
             for i in range(len(node_mapping)):
                 loss += (node_mapping[i].expectation(final_state) - 0.1*solution[i])**2
-            print(loss)
             return loss
 
         def _loss_warmup_tensor(params, circuit, node_mapping, solution):
