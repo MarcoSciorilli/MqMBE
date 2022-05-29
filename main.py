@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
 
     import networkx as nx
-    # vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_SLSQP_warmed')
+    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_SLSQP_warmed_bur')
 
 
     graph_dict = {}
@@ -28,9 +28,9 @@ if __name__ == '__main__':
 
     vq.dataretriver.Benchmarker(starting=10, ending=11, trials=20, graph_dict=graph_dict, nodes_number=100,
                                 kind='multibaseVQA',
-                                layer_number=list(range(15,20)), optimization='SLSQP', compression=2,
+                                layer_number=list(range(0,20)), optimization='SLSQP', compression=2,
                                 entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2],
-                                database_name='MaxCutDatabase_100_SLSQP_warmed', warmup=True)
+                                database_name='MaxCutDatabase_100_SLSQP_warmed_bur', warmup=True)
 
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # for i in range(4, 85):
     #     print(f'Nodes number:{i}')
     # vq.dataretriver.Benchmarker(starting=0, ending=100, trials=20, nodes_number=100,
-    #                                 kind='goemans_williamson',  graph_dict=graph_dict, database_name='MaxCutDatabase_gw')
+    #                                 kind='BURER2002',  graph_dict=graph_dict, database_name='MaxCutDatabase_bur')
     # for k in [4,5]:
     #     for i in range(10, 19):
     #         print(f'Nodes number:{i}')

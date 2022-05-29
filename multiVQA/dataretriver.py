@@ -58,20 +58,20 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        # if self.qubits is None or self.qubits < 15:
-        #     qibo.set_backend("numpy")
-        #     #if precision == '32-bits':
-        #     qibo.set_precision('single')
-        #     my_time = time()
-        #     self._eigensolver_evaluater_parallel()
-        #     print("Total time:", time() - my_time)
-        # else:
-        qibo.set_backend("numpy")
-        if precision == '32-bits':
-            qibo.set_precision('single')
-        my_time = time()
-        self._eigensolver_evaluater_serial()
-        print("Total time:", time() - my_time)
+        if self.qubits is None or self.qubits < 15:
+            qibo.set_backend("numpy")
+            if precision == '32-bits':
+                qibo.set_precision('single')
+            my_time = time()
+            self._eigensolver_evaluater_parallel()
+            print("Total time:", time() - my_time)
+        else:
+            qibo.set_backend("numpy")
+            if precision == '32-bits':
+                qibo.set_precision('single')
+            my_time = time()
+            self._eigensolver_evaluater_serial()
+            print("Total time:", time() - my_time)
 
 
 
@@ -130,7 +130,7 @@ class Benchmarker(object):
                 max_energy, solution = result[1], str(result[0])
                 energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
-            else:
+            elif self.kind == 'classicVQE' or self.kind == 'multibaseVQA':
                 if self.graph_dict is None:
                     if self.precision == '32-bits_':
                         adjacency_matrix, max_eigenvalue = self._graph_to_dict_32(graph)
@@ -170,9 +170,25 @@ class Benchmarker(object):
 
                 solver.set_activation(self.activation_function)
                 my_time = time()
+                if self.optimization == 'COBYLA':
+                    bounds = [[-np.pi, np.pi] for i in range(len(initial_parameters))]
+                    cons = []
+                    for factor in range(len(bounds)):
+                        lower, upper = bounds[factor]
+                        l = {'type': 'ineq',
+                             'fun': lambda x, lb=lower, i=factor: x[i] - lb}
+                        u = {'type': 'ineq',
+                             'fun': lambda x, ub=upper, i=factor: ub - x[i]}
+                        cons.append(l)
+                        cons.append(u)
+                    bounds = None
+                else:
+                    bounds = [(-np.pi, np.pi) for i in range(len(initial_parameters))]
+                    cons = None
+
                 if self.warmup:
                     import ast
-                    solution = read_data('MaxCutDatabase_gw', 'MaxCutDatabase_gw', ['solution'],
+                    solution = read_data('MaxCutDatabase_bur', 'MaxCutDatabase_bur', ['solution'],
                                                     {'instance': instance_name, 'trial': trial})
                     solution = solution[0][0]
                     solution = solution[:1] + solution[(1+1):]
@@ -184,10 +200,7 @@ class Benchmarker(object):
                     solver.set_approx_solution(solution)
                     result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
                                                                                                    method=self.optimization,
-                                                                                                   bounds=(
-                                                                                                   (-np.pi, np.pi) for i
-                                                                                                   in range(
-                                                                                                       len(initial_parameters))),
+                                                                                                   bounds=bounds,constraints=cons,
                                                                                                    tol=1e-02,
                                                                                                    options={
                                                                                                        'maxiter': 1000000000}, warmup=self.warmup)
@@ -196,7 +209,7 @@ class Benchmarker(object):
                 print(f'Warmup time:{timing}')
                 my_time = time()
                 result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
-                                                                                               method=self.optimization, bounds=((-np.pi, np.pi) for i in range(len(initial_parameters))), tol=1e-03,
+                                                                                               method=self.optimization, bounds=bounds, tol=1e-03,constraints=cons,
                                                                                                options={'maxiter': 1000000000})
                 timing = time() - my_time
 
@@ -213,6 +226,18 @@ class Benchmarker(object):
                     unrounded_solution), str(solution)
                 energy_ratio = (cut - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
                 activation_function_name = self.activation_function.__name__
+            else:
+                import MQLib
+
+                my_time = time()
+
+                instance = MQLib.Instance('M', nx.to_numpy_array(graph))
+                result = MQLib.runHeuristic(self.kind, instance, 1)
+                timing = my_time - time()
+                max_energy, solution = result['objval'], str(result['solution'])
+                energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
+                qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
+
             if max_energy == energy_ratio:
                 energy_ratio = 'None'
 
@@ -245,12 +270,7 @@ class Benchmarker(object):
         return edges, max_eigenvalue #(max_eigenvalue+min_eigenvalue)/2
 
     def _graph_to_dict_given(self, graph):
-        adj_matrix = np.zeros(shape=[int(max(graph.adj)) + 1, int(max(graph.adj)) + 1])
-        for i in graph.adj:
-            for j in graph.adj[i]:
-                if graph.adj[i][j]['weight'] == 0:
-                    continue
-                adj_matrix[int(i) - 1, int(j) - 1] = graph.adj[i][j]['weight']
+        adj_matrix = nx.to_numpy_array(graph)
         eigenvalues, _ = np.linalg.eig(adj_matrix)
         max_eigenvalue = np.max(eigenvalues)
         edges = {}

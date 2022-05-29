@@ -269,7 +269,10 @@ class MultibaseVQA(object):
         def _retrive_solution(params, circuit):
             circuit.set_parameters(params)
             final_state = circuit()
-            first_part = [node.expectation(final_state) for node in self.node_mapping]
+            if method == 'sgd':
+                first_part = [node.expectation(final_state).numpy for node in self.node_mapping]
+            else:
+                first_part = [node.expectation(final_state) for node in self.node_mapping]
             return first_part
 
         def _round(num):
