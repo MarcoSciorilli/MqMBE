@@ -18,7 +18,7 @@ class Benchmarker(object):
                  initial_parameters='None', ratio_total_words='None', pauli_string_length='None', compression=None,
                  lower_order_terms=None,
                  entanglement='None',
-                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = '64-bits', database_name='MaxCutDatabase', warmup = False):
+                 graph_dict=None, graph_kind='indexed', activation_function='None', hyperparameters='None', shuffle=False, qubits=None, same_letter=True, precision = 'double', database_name='MaxCutDatabase', warmup = False, multiprocessing=True):
 
         if layer_number is None:
             layer_number = ['None']
@@ -58,17 +58,15 @@ class Benchmarker(object):
             self.qubits = MultibaseVQA.get_num_qubits(self.nodes_number, self.pauli_string_length,
                                         self.ratio_total_words)
 
-        if self.qubits is None or self.qubits < 15:
+        if (self.qubits is None or self.qubits < 25) and multiprocessing == True:
             qibo.set_backend("numpy")
-            if precision == '32-bits':
-                qibo.set_precision('single')
+            qibo.set_precision(precision)
             my_time = time()
             self._eigensolver_evaluater_parallel()
             print("Total time:", time() - my_time)
         else:
             qibo.set_backend("numpy")
-            if precision == '32-bits':
-                qibo.set_precision('single')
+            qibo.set_precision(precision)
             my_time = time()
             self._eigensolver_evaluater_serial()
             print("Total time:", time() - my_time)
@@ -76,7 +74,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 20
+        process_number = 30
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
@@ -169,7 +167,7 @@ class Benchmarker(object):
                     solver.encode_nodes(self.nodes_number, self.pauli_string_length, self.ratio_total_words)
 
                 solver.set_activation(self.activation_function)
-                my_time = time()
+
                 if self.optimization == 'COBYLA':
                     bounds = [[-np.pi, np.pi] for i in range(len(initial_parameters))]
                     cons = []
@@ -188,7 +186,7 @@ class Benchmarker(object):
 
                 if self.warmup:
                     import ast
-                    solution = read_data('MaxCutDatabase_bur', 'MaxCutDatabase_bur', ['solution'],
+                    solution = read_data('MaxCutDatabase_512_bur', 'MaxCutDatabase_512_bur', ['solution'],
                                                     {'instance': instance_name, 'trial': trial})
                     solution = solution[0][0]
                     solution = solution[:1] + solution[(1+1):]
@@ -198,6 +196,7 @@ class Benchmarker(object):
 
                     # solution = np.array([json.loads(solution[0][0])])
                     solver.set_approx_solution(solution)
+                    my_time = time()
                     result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
                                                                                                    method=self.optimization,
                                                                                                    bounds=bounds,constraints=cons,
@@ -205,8 +204,8 @@ class Benchmarker(object):
                                                                                                    options={
                                                                                                        'maxiter': 1000000000}, warmup=self.warmup)
                     initial_parameters = parameters
-                timing = time() - my_time
-                print(f'Warmup time:{timing}')
+                    timing = time() - my_time
+                    print(f'Warmup time:{timing}')
                 my_time = time()
                 result, cut, parameters, extra, unrounded_solution, solution = solver.minimize(initial_parameters,
                                                                                                method=self.optimization, bounds=bounds, tol=1e-03,constraints=cons,
@@ -229,11 +228,9 @@ class Benchmarker(object):
             else:
                 import MQLib
 
-                my_time = time()
-
                 instance = MQLib.Instance('M', nx.to_numpy_array(graph))
-                result = MQLib.runHeuristic(self.kind, instance, 1)
-                timing = my_time - time()
+                result = MQLib.runHeuristic(self.kind, instance, 0.00001, seed=trial)
+                timing = result['bestsolhistory_runtimes'][1]
                 max_energy, solution = result['objval'], str(result['solution'])
                 energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function

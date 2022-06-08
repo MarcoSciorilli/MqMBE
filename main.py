@@ -18,20 +18,24 @@ if __name__ == '__main__':
 
 
     import networkx as nx
-    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_SLSQP_warmed_bur')
+    # vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_SLSQP_rotating_full')
+
 
 
     graph_dict = {}
+    # graph_dict["toruspm3-8-50.dat"] = (nx.read_weighted_edgelist("toruspm3-8-50.dat"))
     graph_dict["w09_100.0"] = (nx.read_weighted_edgelist("w09_100.0"))
     graph_dict["w09_100.1"] = (nx.read_weighted_edgelist("w09_100.1"))
     graph_dict["w09_100.2"] = (nx.read_weighted_edgelist("w09_100.2"))
-
+    #
     vq.dataretriver.Benchmarker(starting=10, ending=11, trials=20, graph_dict=graph_dict, nodes_number=100,
                                 kind='multibaseVQA',
-                                layer_number=list(range(0,20)), optimization='SLSQP', compression=2,
-                                entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2],
-                                database_name='MaxCutDatabase_100_SLSQP_warmed_bur', warmup=True)
+                                layer_number=list(range(2,30,2)), optimization='SLSQP', compression=2,
+                                entanglement='rotating_full', activation_function=np.tanh, hyperparameters=[1.5, 2],
+                                database_name='MaxCutDatabase_100_SLSQP_rotating_full', multiprocessing=True)
 
+    # vq.dataretriver.Benchmarker(starting=0, ending=100, trials=20, nodes_number=512,
+    #                                 kind='BURER2002',  graph_dict=graph_dict, database_name='MaxCutDatabase_512_bur')
     # for i in range(14, 19):
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, nodes_number=i, kind='bruteforce')
 
@@ -53,15 +57,15 @@ if __name__ == '__main__':
     #                             entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2],
     #                             graph_kind='fully')
 
-    # for i in [9, 18, 30, 45]:
+    # for i in [ 550]:
     #     print(f'Nodes number:{i}')
     #     vq.dataretriver.Benchmarker(starting=0, ending=100, trials=5, nodes_number=i, kind='multibaseVQA',
-    #                                 layer_number=list(range(1,11)), optimization='SLSQP', compression=2,
-    #                                 entanglement='article', activation_function=np.tanh, hyperparameters=[1.5, 2], graph_kind='fully')
-    # for i in [9, 18, 30, 45]:
+    #                                 layer_number=list(range(5)), optimization='COBYLA', compression=2,
+    #                                 entanglement='simple', activation_function=np.tanh, hyperparameters=[1.5, 2], precision='single', database_name='Test', multiprocessing=False)
+    # for i in [9 ]:
     #     vq.dataretriver.Benchmarker(starting=0, ending=10, trials=5, nodes_number=i, kind='multibaseVQA',
-    #                                 layer_number=list(range(0, 5)), optimization='SLSQP', compression=2,
-    #                                 entanglement='article', activation_function=np.tanh, hyperparameters=[1.5,2], database_name='MaxCutDatabase_negative_integer')
+    #                                 layer_number=list(range(1, 6)), optimization='COBYLA', compression=2,qubits=4,
+    #                                 entanglement='rotating', activation_function=np.tanh, hyperparameters=[1.5,2], database_name='MaxCutDatabase_COBYLA_rotating', precision='single')
 
     # def fine_tuner(hyperparameters, layers, nodes):
     #     def func(hyperparameters, layers, nodes):

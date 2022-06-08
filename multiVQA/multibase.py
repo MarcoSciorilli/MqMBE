@@ -7,7 +7,10 @@ from itertools import combinations
 import tensorflow as tf
 import numpy as np
 import random
-from itertools import combinations
+from itertools import combinations, product
+
+global expectations_method
+expectations_method = False
 
 class MultibaseVQA(object):
     from qibo import optimizers
@@ -58,16 +61,31 @@ class MultibaseVQA(object):
             # where (0, 1, 2, 3) -> 1XYZ and so on
             from qibo import hamiltonians
             import numpy as np
-            pauli_matrices = np.array([I, X, Y, Z])
-            word = np.intc(1)
-            for qubit, i in enumerate(indices):
-                word *= pauli_matrices[i](qubit + int(k))
-            if qubits:
-                qubits_list = list(range(qubits))
-                qubits_list.remove(int(k))
-                for j in qubits_list:
-                    word *= pauli_matrices[0](j)
-            return hamiltonians.SymbolicHamiltonian(word)
+
+
+
+            if expectations_method:
+                pauli_matrices = ['I', 'X', 'Y', 'Z']
+                word = tuple()
+                for i in indices:
+                    word += (pauli_matrices[i],)
+                if qubits:
+                    qubits_list = list(range(qubits))
+                    qubits_list.remove(int(k))
+                    for j in qubits_list:
+                        word *= pauli_matrices[0](j)
+                return word
+            else:
+                pauli_matrices = np.array([I, X, Y, Z])
+                word = np.int(1)
+                for qubit, i in enumerate(indices):
+                    word *= pauli_matrices[i](qubit + int(k))
+                if qubits:
+                    qubits_list = list(range(qubits))
+                    qubits_list.remove(int(k))
+                    for j in qubits_list:
+                        word *= pauli_matrices[0](j)
+                return hamiltonians.SymbolicHamiltonian(word)
 
         if compression is None:
 
@@ -88,10 +106,33 @@ class MultibaseVQA(object):
 
             num_strings = len(pauli_strings)
             # position i stores string corresponding to the i-th node.
-            self.node_mapping = [
-                get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings)) for i
-                in range(num_nodes)]
-
+            if expectations_method:
+                node_mapping= []
+                for current_string in product(["I", "X", "Y", "Z"], repeat=9):
+                    current_string_dic = {}
+                    for j in current_string:
+                        if j in current_string_dic:
+                            current_string_dic[j] = current_string_dic[j] + 1
+                        else:
+                            current_string_dic[j] = 0
+                    if len(current_string_dic) > 2 or 'I' not in current_string_dic or current_string_dic[
+                        'I'] < 9 - 3 or current_string_dic['I'] > 9 - 3:
+                        continue
+                    else:
+                        node_mapping.append(current_string)
+                import scipy
+                for i in range(len(node_mapping) - 1):
+                    smallest = 1000
+                    for j in range(len(node_mapping) - 1, i - 1, -1):
+                        if scipy.spatial.distance.hamming(node_mapping[i], node_mapping[j]) < smallest:
+                            smallest = j
+                    node_mapping[i + 1], node_mapping[smallest] = node_mapping[smallest], node_mapping[i + 1]
+                self.node_mapping = node_mapping
+            else:
+                self.node_mapping = [
+                    get_pauli_word(pauli_strings[int(i % num_strings)], pauli_string_length * floor(i / num_strings))
+                    for i
+                    in range(num_nodes)]
         return ceil(num_nodes / num_strings)
 
     def set_activation(self, function):
@@ -148,43 +189,50 @@ class MultibaseVQA(object):
                  hessp=None, bounds=None, constraints=(), tol=None, callback=None,
                  options=None, processes=None, compile=False, warmup = False):
 
-        '''
-        def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
-            if len(self.parameter_iteration) > 1:
-                previous_params = self.parameter_iteration[-2]
-                circuit.set_parameters(previous_params)
-                previous_final_state = circuit()
-                # defines loss function with given activation function
-                circuit.set_parameters(params)
-                final_state = circuit()
-                loss = 0
-                for i in adjacency_matrix:
-                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) * activation_function(node_mapping[i[1]].expectation(final_state))
-
-                penalization = 0
-                for i in range(len(node_mapping)):
-                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2 + activation_function(node_mapping[i].expectation(final_state)*node_mapping[i].expectation(previous_final_state)))
-                return loss + penalization
-            else:
-                circuit.set_parameters(params)
-                final_state = circuit()
-                loss = 0
-                for i in adjacency_matrix:
-                    loss += adjacency_matrix[i] * activation_function(node_mapping[i[0]].expectation(final_state)) \
-                            * activation_function(node_mapping[i[1]].expectation(final_state))
-                penalization = 0
-                for i in range(len(node_mapping)):
-                    penalization += ((node_mapping[i].expectation(final_state))**2-(1/np.sqrt(len(node_mapping))))**2
-                return loss + penalization
-        '''
-
         def _loss(params, circuit, adjacency_matrix, activation_function, node_mapping):
             # defines loss function with given activation function
             circuit.set_parameters(params)
-            final_state = circuit()
             qubits = circuit.nqubits
             loss = 0
-            node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
+            if expectations_method:
+                final_state = circuit().numpy()
+                tstate = np.copy(final_state)
+                representation = []
+                for gate in node_mapping:
+                    tstate = gate(tstate)
+                    representation.append(np.conj(tstate).dot(final_state).real)
+                pauli_basis_representation = asarray(representation)
+                node_mapping_expectation = pauli_basis_representation
+            else:
+                final_state = circuit()
+                node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
+            for i in adjacency_matrix:
+                loss += adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
+                        * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits)
+
+            penalization = 0
+            for i in range(len(node_mapping)):
+                penalization += ((node_mapping_expectation[i])**2)
+            return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
+
+
+        def _loss_derivative(params, circuit, adjacency_matrix, activation_function, node_mapping):
+            # defines loss function with given activation function
+            circuit.set_parameters(params)
+            qubits = circuit.nqubits
+            loss = 0
+            if expectations_method:
+                final_state = circuit().numpy()
+                tstate = np.copy(final_state)
+                representation = []
+                for gate in node_mapping:
+                    tstate = gate(tstate)
+                    representation.append(np.conj(tstate).dot(final_state).real)
+                pauli_basis_representation = asarray(representation)
+                node_mapping_expectation = pauli_basis_representation
+            else:
+                final_state = circuit()
+                node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
             for i in adjacency_matrix:
                 loss += adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
                         * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits)
@@ -322,12 +370,30 @@ class MultibaseVQA(object):
                     options = { 'optimizer' : 'Nadam', "learning_rate": 0.01,  "nepochs": 10000}
                 else:
                     loss = _loss
-                    args = (self.circuit, self.adjacency_matrix, self.activation_function,self.node_mapping)
                     if method == "cma":
                         dtype = getattr(K.np, K._dtypes.get('DTYPE'))
                         loss = lambda p, c, ad, af, nm: dtype(_loss(p, c, ad, af, nm))
                     elif method != "sgd":
+                        if expectations_method:
+                            from qibo import matrices
+                            from functools import reduce
+                            from numpy import pi, log10, asarray, kron
+                            from qibo import gates as gt
+                            previous_string = self.circuit.nqubits * ("I")
+                            unitaries = []
+                            for current_string in self.node_mapping:
+                                qb, matlist = [], []
+                                for i, (g1, g2) in enumerate(zip(previous_string, current_string)):
+                                    if g1 != g2:
+                                        qb.append(i)
+                                        matlist.append(getattr(matrices, g2) @ getattr(matrices, g1))
+                                if qb:
+                                    matrix = reduce(kron, matlist)
+                                    unitaries.append(gt.Unitary(matrix, *qb))
+                                previous_string = current_string
+                            self.node_mapping = unitaries
                         loss = lambda p, c, ad, af, nm: K.to_numpy(_loss(p, c, ad, af, nm))
+                    args = (self.circuit, self.adjacency_matrix, self.activation_function, self.node_mapping)
 
 
         result, parameters, extra = self.optimizers.optimize(loss, initial_state,
@@ -340,4 +406,5 @@ class MultibaseVQA(object):
         solution = _retrive_solution(parameters, self.circuit)
         cut_value = _cut_value(parameters, self.circuit)
         self.circuit.set_parameters(parameters)
+        print(cut_value)
         return result, cut_value, parameters, extra, solution, [_round(i) for i in solution]
