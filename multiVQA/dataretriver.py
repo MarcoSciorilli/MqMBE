@@ -10,7 +10,7 @@ import networkx as nx
 from multiVQA.datamanager import insert_value_table, connect_database, create_table, read_data
 import math
 import json
-
+import MQLib
 
 class Benchmarker(object):
 
@@ -74,7 +74,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 30
+        process_number = 64
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
@@ -120,13 +120,13 @@ class Benchmarker(object):
             qubits, self.compression, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
         else:
             np.random.seed(trial+instance)
-            result_exact = self._get_exact_solution(instance)
+            result_exact = self._get_exact_solution(instance, graph)
             if self.kind == 'goemans_williamson':
                 my_time = time()
                 result = goemans_williamson(graph)
                 timing = my_time - time()
                 max_energy, solution = result[1], str(result[0])
-                energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
+                energy_ratio = (max_energy / (result_exact[0][0]))
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
             elif self.kind == 'classicVQE' or self.kind == 'multibaseVQA':
                 if self.graph_dict is None:
@@ -223,16 +223,14 @@ class Benchmarker(object):
                 max_energy, min_energy, number_parameters, initial_parameters, parameters, unrounded_solution, solution = cut, 'None', len(
                     initial_parameters), str(initial_parameters.tolist()), str(parameters.tolist()), str(
                     unrounded_solution), str(solution)
-                energy_ratio = (cut - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
+                energy_ratio = (cut) / (result_exact[0][0])
                 activation_function_name = self.activation_function.__name__
             else:
-                import MQLib
-
                 instance = MQLib.Instance('M', nx.to_numpy_array(graph))
                 result = MQLib.runHeuristic(self.kind, instance, 0.00001, seed=trial)
                 timing = result['bestsolhistory_runtimes'][1]
                 max_energy, solution = result['objval'], str(result['solution'])
-                energy_ratio = (max_energy - result_exact[0][1]) / (result_exact[0][0] - result_exact[0][1])
+                energy_ratio = (max_energy) / (result_exact[0][0])
                 qubits, self.ratio_total_words, self.pauli_string_length, epochs, parameters, number_parameters, unrounded_solution, min_energy, initial_parameters, activation_function_name = 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', self.initial_parameters, self.activation_function
 
             if max_energy == energy_ratio:
@@ -320,13 +318,16 @@ class Benchmarker(object):
             instance = graph.return_index()
         return graph, instance
 
-    def _get_exact_solution(self,instance):
+    def _get_exact_solution(self,instance, graph):
         result_exact = read_data(self.database_name, self.database_name, ['max_energy', 'min_energy'],
                                                 {'kind': 'bruteforce', 'instance': instance,
                                                  'nodes_number': self.nodes_number,
                                                  'graph_kind': self.graph_kind})
         if len(result_exact) == 0:
-            result_exact = [(1, 0)]
+            instance = MQLib.Instance('M', nx.to_numpy_array(graph))
+            result = MQLib.runHeuristic('BURER2002', instance, 0.1)
+            max_energy = result['objval']
+            result_exact = [(max_energy, 0)]
         return result_exact
 
     def _smart_initialization(self, instance, trial, circuit, layer):

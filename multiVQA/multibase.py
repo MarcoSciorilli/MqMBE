@@ -23,7 +23,7 @@ class MultibaseVQA(object):
         self.max_eigenvalue = max_eigenvalue
         self.hyperparameters = hyperparameters
         self.approx_solution = None
-
+        self.ratio = 0
 
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
@@ -213,7 +213,12 @@ class MultibaseVQA(object):
             penalization = 0
             for i in range(len(node_mapping)):
                 penalization += ((node_mapping_expectation[i])**2)
-            return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
+            loss_1 = 0
+            for i in adjacency_matrix:
+                loss_1 += abs(adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
+                        * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits))
+            self.ratio = loss_1/(self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization)
+            return loss + (self.hyperparameters[1] *len(node_mapping)/3-0.6666666)* abs(self.max_eigenvalue)*penalization
 
 
         def _loss_derivative(params, circuit, adjacency_matrix, activation_function, node_mapping):

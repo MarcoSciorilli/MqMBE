@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 from qiskit_optimization import QuadraticProgram
 from itertools import combinations, groupby
+from itertools import product
 
 
 class RandomGraphs(object):

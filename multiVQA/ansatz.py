@@ -17,16 +17,12 @@ def circuit_none(size: int = 6) -> models.Circuit:
 
 def var_form(size=6, p: int = 0, entanglement='basic'):
     c = models.Circuit(size)
-    if entanglement == 'simple' or entanglement == 'double_entanglement' or entanglement == 'rotating':
+    if entanglement == 'simple' or entanglement == 'double_entanglement'  or entanglement == 'rotating':
         c.add(gates.RY(q, theta=0, trainable=True) for q in range(size))
     elif entanglement == 'rotating_full':
         pass
     else:
-        c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
-        c.add(gates.RX(q, theta=-math.pi/2, trainable=False) for q in range(size))
-        c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
-        c.add(gates.RX(q, theta=math.pi/2, trainable=False) for q in range(size))
-        c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
+        c.add(gates.U3(q, theta=0, phi=0, lam=0, trainable=True) for q in range(size))
 
     if entanglement == 'circular':
         for l in range(1, p + 1):
@@ -118,11 +114,11 @@ def var_form(size=6, p: int = 0, entanglement='basic'):
             c.add(gates.RY(q, theta=0, trainable=True) for q in range(size))
 
     if entanglement == 'rotating_full':
-        for l in range(0, p + 1):
+        for l in range(1, p + 1):
             if size == 2:
                 c.add(gates.CZ(0, 1))
             else:
-                entang_list=[ q for q in range(l, size + l)]
+                entang_list=[ q for q in range(l-1, size + l-1)]
                 def refit(entang_list, size):
                     for i in range(len(entang_list)):
                         if entang_list[i] > size - 1:
@@ -133,11 +129,7 @@ def var_form(size=6, p: int = 0, entanglement='basic'):
                         return refit(entang_list, size)
                 entang_list = refit(entang_list, size)
                 c.add(gates.CZ(entang_list[q-1], entang_list[q]) for q in range(1, len(entang_list), 2))
-            c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
-            c.add(gates.RX(q, theta=-math.pi / 2, trainable=False) for q in range(size))
-            c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
-            c.add(gates.RX(q, theta=math.pi / 2, trainable=False) for q in range(size))
-            c.add(gates.RZ(q, theta=0, trainable=True) for q in range(size))
+            c.add(gates.U3(q, theta=0, phi=0, lam=0, trainable=True) for q in range(size))
 
     if entanglement == 'article_RX':
         for l in range(1, p + 1):
