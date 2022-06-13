@@ -1,3 +1,5 @@
+import math
+import copy
 from numpy.random import uniform, randint
 from numpy import ceil, floor, ndindex, tanh
 from qibo.symbols import I, X, Y, Z
@@ -8,7 +10,7 @@ import tensorflow as tf
 import numpy as np
 import random
 from itertools import combinations, product
-
+import mpmath
 global expectations_method
 expectations_method = False
 
@@ -24,6 +26,7 @@ class MultibaseVQA(object):
         self.hyperparameters = hyperparameters
         self.approx_solution = None
         self.ratio = 0
+        self.node_expectation_mapping = 0
 
     @staticmethod
     def get_num_qubits(num_nodes, pauli_string_length, ratio_total_words):
@@ -206,6 +209,7 @@ class MultibaseVQA(object):
             else:
                 final_state = circuit()
                 node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
+            self.node_expectation_mapping = node_mapping_expectation
             for i in adjacency_matrix:
                 loss += adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
                         * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits)
@@ -218,34 +222,42 @@ class MultibaseVQA(object):
                 loss_1 += abs(adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
                         * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits))
             self.ratio = loss_1/(self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization)
-            return loss + (self.hyperparameters[1] *len(node_mapping)/3-0.6666666)* abs(self.max_eigenvalue)*penalization
+            # print('LOSS: ',loss + self.hyperparameters[1] *(len(node_mapping)/3-0.6666666)* abs(self.max_eigenvalue)*penalization)
+            return loss + self.hyperparameters[1] *(len(node_mapping)/3-0.6666666)* abs(self.max_eigenvalue)*penalization
 
 
         def _loss_derivative(params, circuit, adjacency_matrix, activation_function, node_mapping):
             # defines loss function with given activation function
             circuit.set_parameters(params)
+            final_state = circuit()
             qubits = circuit.nqubits
-            loss = 0
-            if expectations_method:
-                final_state = circuit().numpy()
-                tstate = np.copy(final_state)
-                representation = []
-                for gate in node_mapping:
-                    tstate = gate(tstate)
-                    representation.append(np.conj(tstate).dot(final_state).real)
-                pauli_basis_representation = asarray(representation)
-                node_mapping_expectation = pauli_basis_representation
-            else:
-                final_state = circuit()
-                node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
-            for i in adjacency_matrix:
-                loss += adjacency_matrix[i] * activation_function(node_mapping_expectation[i[0]]*self.hyperparameters[0]*qubits) \
-                        * activation_function(node_mapping_expectation[i[1]]*self.hyperparameters[0]*qubits)
 
-            penalization = 0
-            for i in range(len(node_mapping)):
-                penalization += ((node_mapping_expectation[i])**2)
-            return loss + self.hyperparameters[1] * abs(self.max_eigenvalue)*penalization
+            node_mapping_expectation = [i.expectation(final_state) for i in node_mapping]
+            gradient = []
+            for j in range(len(params)):
+
+                params_left, params_right = copy.deepcopy(params), copy.deepcopy(params)
+                params_left[j] = params[j] + (math.pi/2)
+                circuit.set_parameters(params_left)
+                final_state_left = circuit()
+                node_mapping_expectation_left = [i.expectation(final_state_left) for i in node_mapping]
+                params_right[j] = params[j] - (math.pi/2)
+                circuit.set_parameters(params_right)
+                final_state_right = circuit()
+                node_mapping_expectation_right = [i.expectation(final_state_right) for i in node_mapping]
+                derivative = [(node_mapping_expectation_left[l]-node_mapping_expectation_right[l])/2 for l in range(len(node_mapping))]
+                loss = 0
+                for i in adjacency_matrix:
+                    loss += adjacency_matrix[i] * self.hyperparameters[0] * qubits * (((np.cosh(node_mapping_expectation[i[0]] * self.hyperparameters[0]*qubits))**(-1)) ** (2) * derivative[i[0]] \
+                            * np.tanh(node_mapping_expectation[i[1]] * self.hyperparameters[0] * qubits) + ((np.cosh(node_mapping_expectation[i[1]] * self.hyperparameters[0] * qubits))**(-1)) ** (2) * derivative[i[1]] \
+                            * np.tanh(node_mapping_expectation[i[0]] * self.hyperparameters[0] * qubits))
+
+                penalization = 0
+                for i in range(len(node_mapping)):
+                    penalization += (node_mapping_expectation[i])*(derivative[i])
+                loss_derivative = loss + self.hyperparameters[1] * 2 * (len(node_mapping) / 3 - 0.6666666) * abs(self.max_eigenvalue) * penalization
+                gradient.append(loss_derivative)
+            return gradient
 
         def _loss_warmup(params, circuit, node_mapping, solution):
             # defines loss function with given activation function
@@ -289,13 +301,14 @@ class MultibaseVQA(object):
             c = lambda i, p: i < len(node_mapping)
             b = lambda i, p: (i + 1, tf.tensor_scatter_nd_update(p, [[i]], [node_mapping[i].expectation(final_state)]))
             node_mapping_expectation = tf.while_loop(c, b, nodes)[1]
-            first_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)), tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0])))
-            second_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1.5, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)),tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1])))
+            first_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)), tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0])))
+            second_term = tf.math.tanh(tf.math.multiply(tf.math.multiply(tf.constant(1, dtype=tf.float64),tf.constant(circuit.nqubits, dtype=tf.float64)),tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 1])))
             loss = tf.math.multiply(tensor_ad_mat_weights, first_term)
             loss = tf.math.multiply(loss, second_term)
             loss = tf.math.reduce_sum(loss)
 
-            penalization_loss = tf.math.multiply(tf.math.multiply(tf.constant(2.0,dtype=tf.float64), tf.math.abs(max_eigenvalue)), tf.math.reduce_sum(tf.math.square(node_mapping_expectation)))
+            penalization_loss = tf.math.multiply(tf.math.multiply(tf.constant(68,dtype=tf.float64), tf.math.abs(max_eigenvalue)), tf.math.reduce_sum(tf.math.square(node_mapping_expectation)))
+            print(tf.math.add(loss, penalization_loss))
             return tf.math.add(loss, penalization_loss)
 
             # first_term = tf.math.tanh( tf.gather(node_mapping_expectation, tensor_ad_mat_edges[:, 0]))
@@ -398,6 +411,7 @@ class MultibaseVQA(object):
                                 previous_string = current_string
                             self.node_mapping = unitaries
                         loss = lambda p, c, ad, af, nm: K.to_numpy(_loss(p, c, ad, af, nm))
+                        jac = lambda p, c, ad, af, nm: K.to_numpy(_loss_derivative(p, c, ad, af, nm))
                     args = (self.circuit, self.adjacency_matrix, self.activation_function, self.node_mapping)
 
 

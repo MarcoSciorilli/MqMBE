@@ -18,21 +18,21 @@ if __name__ == '__main__':
 
 
     import networkx as nx
-    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_updatedloss_param')
+    vq.dataretriver.Benchmarker.initialize_database('MaxCutDatabase_100_derivative')
 
 
     #
     graph_dict = {}
-    # # # graph_dict["toruspm3-8-50.dat"] = (nx.read_weighted_edgelist("toruspm3-8-50.dat"))
+    # graph_dict["toruspm3-8-50.dat"] = (nx.read_weighted_edgelist("toruspm3-8-50.dat"))
     graph_dict["w09_100.0"] = (nx.read_weighted_edgelist("w09_100.0"))
     graph_dict["w09_100.1"] = (nx.read_weighted_edgelist("w09_100.1"))
     graph_dict["w09_100.2"] = (nx.read_weighted_edgelist("w09_100.2"))
     # # # #
     vq.dataretriver.Benchmarker(starting=10, ending=11, trials=20, graph_dict=graph_dict, nodes_number=100,
                                 kind='multibaseVQA',
-                                layer_number=list(range(2, 30,2)), optimization='SLSQP', compression=2,
+                                layer_number=list(range(12, 30, 2)), optimization='SLSQP', compression=2,
                                 entanglement='rotating', activation_function=np.tanh, hyperparameters=[1, 0.4],
-                                database_name='MaxCutDatabase_100_updatedloss_param', multiprocessing=True)
+                                database_name='MaxCutDatabase_100_derivative', multiprocessing=True)
 
     # vq.dataretriver.Benchmarker(starting=0, ending=100, trials=20, nodes_number=512,
     #                                 kind='BURER2002',  graph_dict=graph_dict, database_name='MaxCutDatabase_512_bur')

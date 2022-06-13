@@ -65,7 +65,7 @@ class Benchmarker(object):
             self._eigensolver_evaluater_parallel()
             print("Total time:", time() - my_time)
         else:
-            qibo.set_backend("numpy")
+            qibo.set_backend("qibojit")
             qibo.set_precision(precision)
             my_time = time()
             self._eigensolver_evaluater_serial()
@@ -74,7 +74,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 64
+        process_number = 36
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
@@ -325,7 +325,7 @@ class Benchmarker(object):
                                                  'graph_kind': self.graph_kind})
         if len(result_exact) == 0:
             instance = MQLib.Instance('M', nx.to_numpy_array(graph))
-            result = MQLib.runHeuristic('BURER2002', instance, 0.1)
+            result = MQLib.runHeuristic('BURER2002', instance, 0.5)
             max_energy = result['objval']
             result_exact = [(max_energy, 0)]
         return result_exact
