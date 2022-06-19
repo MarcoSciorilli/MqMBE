@@ -65,7 +65,7 @@ class Benchmarker(object):
             self._eigensolver_evaluater_parallel()
             print("Total time:", time() - my_time)
         else:
-            qibo.set_backend("qibojit")
+            qibo.set_backend("numpy")
             qibo.set_precision(precision)
             my_time = time()
             self._eigensolver_evaluater_serial()
@@ -74,7 +74,7 @@ class Benchmarker(object):
 
 
     def _eigensolver_evaluater_parallel(self):
-        process_number = 36
+        process_number = 64
         pool = mp.Pool(process_number)
         if self.graph_dict is not None:
             [pool.apply_async(self._single_graph_evaluation, (0, trial, (graph, self.graph_dict[graph]), layer)) for layer in
@@ -254,7 +254,8 @@ class Benchmarker(object):
     def _graph_to_dict(self, graph):
         eigenvalues, _ = np.linalg.eig(nx.to_numpy_matrix(graph))
         max_eigenvalue = np.max(eigenvalues)
-        min_eigenvalue = np.min(eigenvalues)
+        # min_eigenvalue = np.min(eigenvalues)
+        # max_eigenvalue = np.sum(np.abs(eigenvalues))
         adjacency_matrix = nx.to_numpy_array(graph)
         edges = {}
         for i in range(adjacency_matrix.shape[0]):
@@ -268,6 +269,7 @@ class Benchmarker(object):
         adj_matrix = nx.to_numpy_array(graph)
         eigenvalues, _ = np.linalg.eig(adj_matrix)
         max_eigenvalue = np.max(eigenvalues)
+        # max_eigenvalue = np.sum(np.abs(eigenvalues))
         edges = {}
         for i in range(adj_matrix.shape[0]):
             for j in range(i):

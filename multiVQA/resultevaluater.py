@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, List
+from typing import List
 import networkx as nx
 import numpy as np
 import cvxpy as cvx

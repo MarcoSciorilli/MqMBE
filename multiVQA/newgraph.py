@@ -2,9 +2,7 @@ from copy import deepcopy
 from typing import Optional, Tuple, List
 import networkx as nx
 import numpy as np
-from qiskit_optimization import QuadraticProgram
 from itertools import combinations, groupby
-from itertools import product
 
 
 class RandomGraphs(object):
@@ -29,38 +27,6 @@ class RandomGraphs(object):
         """
         dummy_graph = nx.complete_graph(size)
         return [RandomGraphs.weighted_graph(graph=dummy_graph) in range(number)]
-
-    @staticmethod
-    def quadratic_program_from_graph(graph: nx.Graph) -> np.array:
-        """
-        Constructs a quadratic program from a given graph for a MaxCut problem instance.
-        :param graph: Underlying graph of the problem.
-        :return: Ising hamiltonian matrix of the graph
-        """
-
-        # Get weight matrix of graph
-        weight_matrix = -nx.adjacency_matrix(graph)
-        shape = weight_matrix.shape
-        size = shape[0]
-
-        # Build qubo matrix Q from weight matrix W
-        qubo_matrix = np.zeros((size, size))
-        qubo_vector = np.zeros(size)
-        for i in range(size):
-            for j in range(size):
-                qubo_matrix[i, j] -= weight_matrix[i, j]
-        for i in range(size):
-            for j in range(size):
-                qubo_vector[i] += weight_matrix[i, j]
-        y_quadratic_program = QuadraticProgram('my_problem')
-        for k in range(size):
-            my_quadratic_program.binary_var(name=f'x_{k}')
-
-        quadratic = qubo_matrix
-        linear = qubo_vector
-        my_quadratic_program.minimize(quadratic=quadratic, linear=linear)
-
-        return my_quadratic_program.to_ising()[0].to_matrix()
 
     @staticmethod
     def weighted_graph(graph: nx.Graph, weight_range: Optional[Tuple[float, float]] = (-10.0, 10.0),
