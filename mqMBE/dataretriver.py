@@ -1,9 +1,9 @@
 from typing import Tuple
-from multiVQA.newgraph import RandomGraphs
-from multiVQA.resultevaluater import brute_force_graph, goemans_williamson
-from multiVQA.ansatz import var_form
-from multiVQA.multibase import MultibaseVQA
-from multiVQA.datamanager import insert_value_table, connect_database, create_table, read_data
+from mqMBE.newgraph import RandomGraphs
+from mqMBE.resultevaluater import brute_force_graph, goemans_williamson
+from mqMBE.ansatz import var_form
+from mqMBE.multibase import MultibaseVQA
+from mqMBE.datamanager import insert_value_table, connect_database, create_table, read_data
 import math
 import json
 import MQLib

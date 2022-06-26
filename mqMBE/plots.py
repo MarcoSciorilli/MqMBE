@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import stats
-from multiVQA.datamanager import read_data
-import multiVQA.multibase as mb
+from mqMBE.datamanager import read_data
+import mqMBE.multibase as mb
 import pandas as pd
 from matplotlib.pyplot import cm
 import cmath
