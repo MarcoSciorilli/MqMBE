@@ -42,7 +42,7 @@ def get_overlap(vector_1, vector_2):
     return overlap
 
 
-def brute_force(w,n):
+def brute_force(w, n):
     cuts ={}
     for b in range(2**n):
         x = [int(t) for t in reversed(list(bin(b)[2:].zfill(n)))]

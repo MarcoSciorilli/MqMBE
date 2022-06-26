@@ -17,7 +17,7 @@ from time import time
 class Benchmarker(object):
 
     def __init__(self, kind: str = 'multibaseVQA', graph_dict: dict = None, nodes_number: int = 18, starting: int = 0,
-                 ending: int = 100, trials: int = 1, layer_number: int = None,
+                 ending: int = 100, trials: int = 1, layer_number: list = None,
                  optimization: str = 'None',
                  initial_parameters: str = 'None', ratio_total_words: float = 'None', pauli_string_length: int = 'None',
                  compression: int = None,
@@ -42,7 +42,7 @@ class Benchmarker(object):
         :param ending: Ending point for the generation of the random instances.
         :param trials: Number of different random initialisation of the parameters of the circuit to try for every
                         instance.
-        :param layer_number: Number of layers to use in the circuit.
+        :param layer_number: List containing the number of layers to use in the circuit.
         :param optimization: Classical optimize to use in the VQA. Scipy optimization and cma are supported, keras one
                             still needs some work.
         :param initial_parameters:Whether or no reuse the parameters found in the previous training as a starting point
@@ -326,7 +326,7 @@ class Benchmarker(object):
         insert_value_table(self.database_name, self.database_name, row)
 
     @staticmethod
-    def _graph_to_dict(graph: nx.graph) -> Tuple[dict, np.array]:
+    def _graph_to_dict(graph: object) -> Tuple[dict, np.array]:
         """
         Function that, given a graph, return a dictionary of the edges and the maximum eigenvalue of the
         adjacency matrix.
@@ -364,7 +364,7 @@ class Benchmarker(object):
                 edges[(np.int32(i), np.int32(j))] = np.float32(adj_matrix[i][j])
         return edges, np.float32(max_eigenvalue)  # (max_eigenvalue+min_eigenvalue)/2
 
-    def _do_graph(self, instance: int) -> Tuple[nx.graph, int]:
+    def _do_graph(self, instance: int) -> Tuple[object, int]:
         """
         Function which, given the user specification, return the wanted generated graph
         :param instance: Index of the graph to generate.
@@ -381,7 +381,7 @@ class Benchmarker(object):
             instance = graph.return_index()
         return graph, instance
 
-    def _get_exact_solution(self, instance: int, graph: nx.graph) -> list:
+    def _get_exact_solution(self, instance: int, graph: object) -> list:
         """
         Function that, given a graph, return either the exact maxcut solution, or the one found by BURER heuristic
         :param instance: istance index number
