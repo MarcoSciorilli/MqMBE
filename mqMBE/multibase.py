@@ -150,7 +150,7 @@ class MultibaseVQA(object):
     def encode_nodes(self, num_nodes: int, pauli_string_length: int, ratio_total_words: float = None,
                      compression: int = None,
                      lower_order_terms: bool = False, shuffle: bool = True, seed: int = 0,
-                     same_letter: bool = True) -> int:
+                     same_letter: bool = True, print_strings = False) -> int:
         """
         Function which save the encodings of the graph nodes in the chosen observables (expressed in symbolic Hamiltonians)
         :param num_nodes: number of nodes in the graph.
@@ -223,7 +223,8 @@ class MultibaseVQA(object):
                 pauli_strings = self._random_pauli_string(pauli_string_length, compression, lower_order_terms,
                                                           shuffle, seed)
             num_strings = len(pauli_strings)
-
+            if print_strings:
+                print(pauli_strings)
             # Alternative method to express the expectation values (not important)
             if self.expectations_method:
                 node_mapping = []

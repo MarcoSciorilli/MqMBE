@@ -381,22 +381,18 @@ class Benchmarker(object):
             instance = graph.return_index()
         return graph, instance
 
-    def _get_exact_solution(self, instance: int, graph: object) -> list:
+    @staticmethod
+    def _get_exact_solution( instance: int, graph: object) -> list:
         """
         Function that, given a graph, return either the exact maxcut solution, or the one found by BURER heuristic
         :param instance: istance index number
         :param graph: graph to find the maxcut
         :return:
         """
-        result_exact = read_data(self.database_name, self.database_name, ['max_energy', 'min_energy'],
-                                 {'kind': 'bruteforce', 'instance': instance,
-                                  'nodes_number': self.nodes_number,
-                                  'graph_kind': self.graph_kind})
-        if len(result_exact) == 0:
-            instance = MQLib.Instance('M', nx.to_numpy_array(graph))
-            result = MQLib.runHeuristic('BURER2002', instance, 0.5)
-            max_energy = result['objval']
-            result_exact = [(max_energy, 0)]
+        instance = MQLib.Instance('M', nx.to_numpy_array(graph))
+        result = MQLib.runHeuristic('BURER2002', instance, 0.5)
+        max_energy = result['objval']
+        result_exact = [(max_energy, 0)]
         return result_exact
 
     def _smart_initialization(self, instance: int, trial: int, circuit: qibo.models.Circuit, layer: int) -> np.array:
